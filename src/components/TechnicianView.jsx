@@ -1,6 +1,9 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setPage, markJobComplete, addToast, addComment, openTicketDrawer, addAuditEntry } from '../redux/ticketSlice';
+import {
+  setPage, markJobComplete, addToast, addComment, openTicketDrawer, addAuditEntry,
+  resolveTicketAsync, toggleWorkerAvailabilityAsync, addCommentAsync,
+} from '../redux/ticketSlice';
 import { useTranslation } from '../utils/translations';
 import PhoneFrame from './PhoneFrame';
 import EmptyState from './EmptyState';
@@ -10,7 +13,15 @@ const CAT_MAP = { Electrical:'⚡', Plumbing:'💧', Furniture:'🪑', Networkin
 
 /* ── Page: Job Feed ── */
 function TechnicianFeed({ jobs, onViewJob, completedIds, onOpenDrawer, t }) {
-  const [available, setAvailable] = useState(true);
+  const dispatch = useDispatch();
+  const { workers } = useSelector(s => s.ticketStore);
+  const myWorker = workers.find(w => w.name === 'Sarathi Kamal') || { id: 'W1', availability: 'Available' };
+  const isAvailable = myWorker.availability === 'Available';
+
+  const handleToggleAvail = () => {
+    const next = isAvailable ? 'Not Available' : 'Available';
+    dispatch(toggleWorkerAvailabilityAsync({ id: myWorker.id, availability: next }));
+  };
 
   return (
     <>
@@ -29,13 +40,13 @@ function TechnicianFeed({ jobs, onViewJob, completedIds, onOpenDrawer, t }) {
       </div>
 
       {/* Availability Toggle */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:`rgba(${available?'16,185,129':'239,68,68'},0.08)`,border:`1px solid rgba(${available?'16,185,129':'239,68,68'},0.2)`,borderRadius:'var(--radius-md)',padding:'10px 14px',marginBottom:18}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:`rgba(${isAvailable?'16,185,129':'239,68,68'},0.08)`,border:`1px solid rgba(${isAvailable?'16,185,129':'239,68,68'},0.2)`,borderRadius:'var(--radius-md)',padding:'10px 14px',marginBottom:18}}>
         <div>
           <div style={{fontSize:13,fontWeight:600}}>{t('availability_status', 'Availability Status')}</div>
-          <div style={{fontSize:11,color:available?'var(--accent-green)':'var(--accent-red)'}}>{available ? t('currently_available', '● Currently Available') : t('not_available', '● Not Available')}</div>
+          <div style={{fontSize:11,color:isAvailable?'var(--accent-green)':'var(--accent-red)'}}>{isAvailable ? t('currently_available', '● Currently Available') : t('not_available', '● Not Available')}</div>
         </div>
-        <div onClick={()=>setAvailable(p=>!p)} style={{width:42,height:24,background:available?'var(--accent-green)':'rgba(100,116,139,0.4)',borderRadius:999,position:'relative',cursor:'pointer',transition:'background 0.3s'}}>
-          <div style={{position:'absolute',[available?'right':'left']:2,top:'50%',transform:'translateY(-50%)',width:20,height:20,background:'white',borderRadius:'50%',transition:'all 0.3s',boxShadow:'0 1px 4px rgba(0,0,0,0.3)'}}/>
+        <div onClick={handleToggleAvail} style={{width:42,height:24,background:isAvailable?'var(--accent-green)':'rgba(100,116,139,0.4)',borderRadius:999,position:'relative',cursor:'pointer',transition:'background 0.3s'}}>
+          <div style={{position:'absolute',[isAvailable?'right':'left']:2,top:'50%',transform:'translateY(-50%)',width:20,height:20,background:'white',borderRadius:'50%',transition:'all 0.3s',boxShadow:'0 1px 4px rgba(0,0,0,0.3)'}}/>
         </div>
       </div>
 
@@ -255,29 +266,30 @@ export default function TechnicianView({ page, isMobile }) {
     dispatch(openTicketDrawer(id));
   }, [dispatch]);
 
-  const handleComplete = useCallback((id, noteText) => {
-    dispatch(markJobComplete(id));
-    if (noteText) {
-      dispatch(addComment({
+  const handleComplete = useCallback(async (id, noteText) => {
+    try {
+      await dispatch(resolveTicketAsync({
         ticketId: id,
-        comment: {
-          id: `C${Date.now()}`,
-          author: 'Sarathi Kamal',
-          role: 'Technician',
-          text: `Work completed by technician. Notes: ${noteText}`,
-          time: 'Just now',
-        },
-      }));
+        notes: noteText || 'Work completed by technician.',
+        actor: 'Sarathi Kamal (Worker)',
+      })).unwrap();
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `Job ${id} completed & saved to database!`, type: 'success' }));
+    } catch {
+      dispatch(markJobComplete(id));
+      if (noteText) {
+        dispatch(addComment({
+          ticketId: id,
+          comment: {
+            id: `C${Date.now()}`,
+            author: 'Sarathi Kamal',
+            role: 'Technician',
+            text: `Work completed by technician. Notes: ${noteText}`,
+            time: 'Just now',
+          },
+        }));
+      }
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `Job ${id} completed & closed!`, type: 'success' }));
     }
-    dispatch(addAuditEntry({
-      id: `AL-${Date.now()}`,
-      action: 'Ticket Resolved',
-      actor: 'Sarathi Kamal (Worker)',
-      target: id,
-      timestamp: new Date().toLocaleString(),
-      category: 'Ticket',
-    }));
-    dispatch(addToast({ id: `toast-${Date.now()}`, message: `Job ${id} completed & closed successfully!`, type: 'success' }));
     setCompletedIds(p=>[...p, id]);
     switchPage('feed');
   }, [dispatch, switchPage]);

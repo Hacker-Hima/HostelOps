@@ -1,6 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setPage, updateAssetCondition, addAssetMaintenanceRecord, addToast, addAuditEntry } from '../redux/ticketSlice';
+import {
+  setPage, updateAssetCondition, addAssetMaintenanceRecord, addToast, addAuditEntry,
+  updateAssetConditionAsync, addAssetMaintenanceRecordAsync,
+} from '../redux/ticketSlice';
 import { useTranslation } from '../utils/translations';
 import PhoneFrame from './PhoneFrame';
 import EmptyState from './EmptyState';
@@ -313,15 +316,25 @@ export default function AssetView({ page, isMobile }) {
     switchPage('asset-detail');
   }, [switchPage]);
 
-  const handleConditionChange = useCallback((tag, cond) => {
-    dispatch(updateAssetCondition({ tag, condition:cond }));
-    dispatch(addAuditEntry({ id:`AL-${Date.now()}`, action:'Asset Condition Updated', actor:'Dr. Meena Sharma (Asset Mgr)', target:tag, timestamp:new Date().toLocaleString(), category:'Asset' }));
-    dispatch(addToast({ id:`toast-${Date.now()}`, message:`${tag} condition set to "${cond}"`, type:'success' }));
+  const handleConditionChange = useCallback(async (tag, cond) => {
+    try {
+      await dispatch(updateAssetConditionAsync({ tag, condition: cond, actor: 'Dr. Meena Sharma (Asset Mgr)' })).unwrap();
+      dispatch(addToast({ id:`toast-${Date.now()}`, message:`${tag} condition set to "${cond}" in database!`, type:'success' }));
+    } catch {
+      dispatch(updateAssetCondition({ tag, condition:cond }));
+      dispatch(addAuditEntry({ id:`AL-${Date.now()}`, action:'Asset Condition Updated', actor:'Dr. Meena Sharma (Asset Mgr)', target:tag, timestamp:new Date().toLocaleString(), category:'Asset' }));
+      dispatch(addToast({ id:`toast-${Date.now()}`, message:`${tag} condition set to "${cond}"`, type:'success' }));
+    }
   }, [dispatch]);
 
-  const handleAddHistory = useCallback((tag, record) => {
-    dispatch(addAssetMaintenanceRecord({ tag, record }));
-    dispatch(addToast({ id:`toast-${Date.now()}`, message:'Maintenance record logged', type:'success' }));
+  const handleAddHistory = useCallback(async (tag, record) => {
+    try {
+      await dispatch(addAssetMaintenanceRecordAsync({ tag, record })).unwrap();
+      dispatch(addToast({ id:`toast-${Date.now()}`, message:'Maintenance record saved to database!', type:'success' }));
+    } catch {
+      dispatch(addAssetMaintenanceRecord({ tag, record }));
+      dispatch(addToast({ id:`toast-${Date.now()}`, message:'Maintenance record logged', type:'success' }));
+    }
   }, [dispatch]);
 
   const LINKS = [

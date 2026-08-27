@@ -1,6 +1,10 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { addTicket, resolveTicket, setPage, selectTicket, addToast, openTicketDrawer } from '../redux/ticketSlice';
+import {
+  addTicket, resolveTicket, setPage, selectTicket, addToast, openTicketDrawer,
+  createTicketAsync, resolveTicketAsync,
+} from '../redux/ticketSlice';
+import api from '../services/api';
 import { useTranslation } from '../utils/translations';
 import PhoneFrame from './PhoneFrame';
 import EmptyState from './EmptyState';
@@ -308,12 +312,22 @@ function StudentScanQR({ t }) {
     dispatch(addToast({ id:`toast-${Date.now()}`, message:'QR-A204-AC-01 scanned successfully!', type:'success' }));
   }, [dispatch]);
 
-  const handleManualLookup = useCallback(() => {
-    const found = assets.find(a => a.tag.toLowerCase() === manualTag.toLowerCase().trim());
-    if (found) {
-      dispatch(addToast({ id:`toast-${Date.now()}`, message:`Found: ${found.name} — ${found.condition}`, type:'info' }));
-    } else {
-      dispatch(addToast({ id:`toast-${Date.now()}`, message:`No asset found for tag "${manualTag}"`, type:'error' }));
+  const handleManualLookup = useCallback(async () => {
+    if (!manualTag.trim()) return;
+    try {
+      const found = await api.assets.getByTag(manualTag.trim());
+      if (found) {
+        dispatch(addToast({ id:`toast-${Date.now()}`, message:`Found: ${found.name} — ${found.condition} (${found.location})`, type:'info' }));
+        return;
+      }
+    } catch {
+      // fallback to store
+      const found = assets.find(a => a.tag.toLowerCase() === manualTag.toLowerCase().trim());
+      if (found) {
+        dispatch(addToast({ id:`toast-${Date.now()}`, message:`Found: ${found.name} — ${found.condition}`, type:'info' }));
+      } else {
+        dispatch(addToast({ id:`toast-${Date.now()}`, message:`No asset found for tag "${manualTag}"`, type:'error' }));
+      }
     }
   }, [manualTag, assets, dispatch]);
 
@@ -424,25 +438,47 @@ export default function StudentView({ page, isMobile }) {
     dispatch(openTicketDrawer(id));
   }, [dispatch]);
 
-  const handleResolve = useCallback((id) => dispatch(resolveTicket(id)), [dispatch]);
+  const handleResolve = useCallback(async (id) => {
+    try {
+      await dispatch(resolveTicketAsync({ ticketId: id, actor: currentUser.name })).unwrap();
+      dispatch(addToast({ id:`toast-${Date.now()}`, message:`${id} confirmed resolved!`, type:'success' }));
+    } catch (err) {
+      dispatch(resolveTicket(id)); // Fallback
+      dispatch(addToast({ id:`toast-${Date.now()}`, message:`${id} marked resolved`, type:'success' }));
+    }
+  }, [dispatch, currentUser.name]);
 
-  const handleTicketSubmit = useCallback((formData) => {
+  const handleTicketSubmit = useCallback(async (formData) => {
     const { category, title, desc, priority } = formData;
-    dispatch(addTicket({
-      id: `TKT-${Math.floor(330 + Math.random() * 70)}`,
-      title,
-      student:       currentUser.name,
-      room:          currentUser.room,
-      category,
-      priority,
-      status:        'Pending',
-      assignedWorker:'Unassigned',
-      assetTag:      `QR-${currentUser.room.replace(/-/g,'')}-${category.toUpperCase().slice(0,3)}-01`,
-      createdAt:     'Just now',
-      creatorRole:   'Student',
-      description:   desc || 'No description provided.',
-    }));
-    handleSwitchPage('tickets');
+    try {
+      await dispatch(createTicketAsync({
+        title,
+        student: currentUser.name,
+        room: currentUser.room,
+        category,
+        priority,
+        description: desc || 'No description provided.',
+        assetTag: `QR-${currentUser.room.replace(/-/g,'')}-${category.toUpperCase().slice(0,3)}-01`,
+      })).unwrap();
+      handleSwitchPage('tickets');
+    } catch (err) {
+      // Fallback
+      dispatch(addTicket({
+        id: `TKT-${Math.floor(330 + Math.random() * 70)}`,
+        title,
+        student: currentUser.name,
+        room: currentUser.room,
+        category,
+        priority,
+        status: 'Pending',
+        assignedWorker: 'Unassigned',
+        assetTag: `QR-${currentUser.room.replace(/-/g,'')}-${category.toUpperCase().slice(0,3)}-01`,
+        createdAt: 'Just now',
+        creatorRole: 'Student',
+        description: desc || 'No description provided.',
+      }));
+      handleSwitchPage('tickets');
+    }
   }, [dispatch, currentUser, handleSwitchPage]);
 
   const renderPageContent = () => {

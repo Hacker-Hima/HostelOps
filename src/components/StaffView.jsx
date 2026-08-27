@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setPage, addToast, addAuditEntry } from '../redux/ticketSlice';
+import { setPage, addToast, addAuditEntry, submitStaffRequestAsync } from '../redux/ticketSlice';
 import { useTranslation } from '../utils/translations';
 import PhoneFrame from './PhoneFrame';
 import EmptyState from './EmptyState';
@@ -255,9 +255,21 @@ export default function StaffView({ page, isMobile }) {
     else dispatch(setPage(id));
   }, [isMobile, dispatch]);
 
-  const handleNewRequest = useCallback((data) => {
-    dispatch(addToast({ id: `toast-${Date.now()}`, message: `Request "${data.title}" submitted successfully!`, type: 'success' }));
-    dispatch(addAuditEntry({ id: `AL-${Date.now()}`, action: 'Staff Request Submitted', actor: 'Sanji (Staff)', target: `REQ-${Math.floor(4100 + Math.random()*900)}`, timestamp: new Date().toLocaleString(), category: 'Request' }));
+  const handleNewRequest = useCallback(async (data) => {
+    try {
+      await dispatch(submitStaffRequestAsync({
+        title: data.title,
+        dept: data.dept,
+        cost: data.cost,
+        urgency: data.urgency,
+        note: data.note,
+        submittedBy: 'Sanji',
+      })).unwrap();
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `Request "${data.title}" submitted and saved to database!`, type: 'success' }));
+    } catch (err) {
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `Request "${data.title}" submitted successfully!`, type: 'success' }));
+      dispatch(addAuditEntry({ id: `AL-${Date.now()}`, action: 'Staff Request Submitted', actor: 'Sanji (Staff)', target: `REQ-${Math.floor(4100 + Math.random()*900)}`, timestamp: new Date().toLocaleString(), category: 'Request' }));
+    }
     switchPage('request-detail');
   }, [dispatch, switchPage]);
 

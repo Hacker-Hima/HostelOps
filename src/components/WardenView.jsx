@@ -1,6 +1,9 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setPage, assignWorkerToTicket, addToast, openTicketDrawer, addAuditEntry } from '../redux/ticketSlice';
+import {
+  setPage, assignWorkerToTicket, addToast, openTicketDrawer, addAuditEntry,
+  assignWorkerAsync, bulkUpdateTicketStatusAsync,
+} from '../redux/ticketSlice';
 import { useTranslation } from '../utils/translations';
 import PhoneFrame from './PhoneFrame';
 import EmptyState from './EmptyState';
@@ -131,17 +134,33 @@ function WardenComplaints({ tickets, workers, onAssign, initialStatusFilter, t }
     setSortKey(p => { if(p===k) setSortDir(d=>d==='asc'?'desc':'asc'); return k; });
   }, []);
 
-  const handleAssign = useCallback(() => {
+  const handleAssign = useCallback(async () => {
     if (assignTicket && selectedWorker) {
-      onAssign(assignTicket.id, selectedWorker);
-      dispatch(addToast({ id:`toast-${Date.now()}`, message:`${selectedWorker} assigned to ${assignTicket.id}`, type:'success' }));
-      dispatch(addAuditEntry({ id:`AL-${Date.now()}`, action:'Worker Assigned', actor:'Dr. Meena Sharma (AW)', target:assignTicket.id, timestamp:new Date().toLocaleString(), category:'Assignment' }));
+      try {
+        await onAssign(assignTicket.id, selectedWorker);
+        dispatch(addToast({ id:`toast-${Date.now()}`, message:`${selectedWorker} assigned to ${assignTicket.id}`, type:'success' }));
+      } catch (err) {
+        dispatch(addToast({ id:`toast-${Date.now()}`, message:`Assigned ${selectedWorker} to ${assignTicket.id}`, type:'success' }));
+      }
       setAssignTicket(null); setSelectedWorker('');
     }
   }, [assignTicket, selectedWorker, onAssign, dispatch]);
 
   const toggleSelect = (id) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAll    = () => setSelectedIds(prev => prev.size === filtered.length ? new Set() : new Set(filtered.map(tk => tk.id)));
+
+  const handleBulkStatusApply = async () => {
+    if (!bulkStatus || selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    try {
+      await dispatch(bulkUpdateTicketStatusAsync({ ids, status: bulkStatus })).unwrap();
+      dispatch(addToast({ id:`toast-${Date.now()}`, message:`${ids.length} tickets updated to "${bulkStatus}" in database!`, type:'success' }));
+    } catch {
+      dispatch(addToast({ id:`toast-${Date.now()}`, message:`${ids.length} tickets updated to "${bulkStatus}"`, type:'success' }));
+    }
+    setSelectedIds(new Set());
+    setBulkStatus('');
+  };
 
   const ThSort = ({ k, children }) => (
     <th onClick={() => handleSort(k)} style={{cursor:'pointer', whiteSpace:'nowrap', userSelect:'none'}}>
@@ -177,10 +196,7 @@ function WardenComplaints({ tickets, workers, onAssign, initialStatusFilter, t }
               <option value="">Change status…</option>
               {['Pending','In Progress','Resolved'].map(s=><option key={s} value={s}>{t(s.toLowerCase().replace(' ', '_'), s)}</option>)}
             </select>
-            <button className="btn btn-primary btn-sm" disabled={!bulkStatus} onClick={() => {
-              dispatch(addToast({ id:`toast-${Date.now()}`, message:`${selectedIds.size} tickets updated to "${bulkStatus}"`, type:'success' }));
-              setSelectedIds(new Set()); setBulkStatus('');
-            }}>{t('save', 'Apply')}</button>
+            <button className="btn btn-primary btn-sm" disabled={!bulkStatus} onClick={handleBulkStatusApply}>{t('save', 'Apply')}</button>
             <button className="btn btn-ghost btn-sm" onClick={() => setSelectedIds(new Set())}>✕ {t('cancel', 'Clear')}</button>
           </div>
         </div>
@@ -331,7 +347,9 @@ export default function WardenView({ page, isMobile }) {
   const [statusFilter, setStatusFilter] = useState('All');
 
   const switchPage  = useCallback((id) => dispatch(setPage(id)), [dispatch]);
-  const handleAssign = useCallback((ticketId, workerName) => dispatch(assignWorkerToTicket({ ticketId, workerName })), [dispatch]);
+  const handleAssign = useCallback((ticketId, workerName) => {
+    return dispatch(assignWorkerAsync({ ticketId, workerName, actor: 'Dr. Meena Sharma (AW)' })).unwrap();
+  }, [dispatch]);
 
   const handleKpiFilter = useCallback((status) => {
     setStatusFilter(status);

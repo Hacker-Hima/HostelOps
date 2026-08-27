@@ -1,6 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setPage, approveStaffReq, rejectStaffReq, addToast, addAuditEntry } from '../redux/ticketSlice';
+import {
+  setPage, approveStaffReq, rejectStaffReq, addToast, addAuditEntry,
+  approveStaffRequestAsync, rejectStaffRequestAsync,
+} from '../redux/ticketSlice';
 import { useTranslation } from '../utils/translations';
 import PhoneFrame from './PhoneFrame';
 import EmptyState from './EmptyState';
@@ -235,16 +238,26 @@ export default function PrincipalView({ page, isMobile }) {
 
   const switchPage = useCallback((id) => dispatch(setPage(id)), [dispatch]);
 
-  const handleApprove = useCallback((id, cost) => {
-    dispatch(approveStaffReq(id));
-    dispatch(addAuditEntry({ id: `AL-${Date.now()}`, action: 'Principal Signed Off', actor: 'Dr. A. Krishnamurthy (Principal)', target: id, timestamp: new Date().toLocaleString(), category: 'Approval' }));
-    dispatch(addToast({ id: `toast-${Date.now()}`, message: `Principal signed off ${id} — ₹${cost?.toLocaleString() || ''} released!`, type: 'success' }));
+  const handleApprove = useCallback(async (id, cost) => {
+    try {
+      await dispatch(approveStaffRequestAsync({ id, actor: 'Dr. A. Krishnamurthy (Principal)', cost })).unwrap();
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `Principal signed off ${id} — ₹${cost?.toLocaleString() || ''} released to department!`, type: 'success' }));
+    } catch {
+      dispatch(approveStaffReq(id));
+      dispatch(addAuditEntry({ id: `AL-${Date.now()}`, action: 'Principal Signed Off', actor: 'Dr. A. Krishnamurthy (Principal)', target: id, timestamp: new Date().toLocaleString(), category: 'Approval' }));
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `Principal signed off ${id} — ₹${cost?.toLocaleString() || ''} released!`, type: 'success' }));
+    }
   }, [dispatch]);
 
-  const handleReject = useCallback((id) => {
-    dispatch(rejectStaffReq(id));
-    dispatch(addAuditEntry({ id: `AL-${Date.now()}`, action: 'Principal Rejected', actor: 'Dr. A. Krishnamurthy (Principal)', target: id, timestamp: new Date().toLocaleString(), category: 'Approval' }));
-    dispatch(addToast({ id: `toast-${Date.now()}`, message: `Request ${id} rejected by Principal`, type: 'warn' }));
+  const handleReject = useCallback(async (id) => {
+    try {
+      await dispatch(rejectStaffRequestAsync({ id, actor: 'Dr. A. Krishnamurthy (Principal)' })).unwrap();
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `Request ${id} rejected in database.`, type: 'warn' }));
+    } catch {
+      dispatch(rejectStaffReq(id));
+      dispatch(addAuditEntry({ id: `AL-${Date.now()}`, action: 'Principal Rejected', actor: 'Dr. A. Krishnamurthy (Principal)', target: id, timestamp: new Date().toLocaleString(), category: 'Approval' }));
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `Request ${id} rejected by Principal`, type: 'warn' }));
+    }
   }, [dispatch]);
 
   const LINKS = [

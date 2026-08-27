@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { markAllNotificationsRead, markNotificationRead } from '../redux/ticketSlice';
+import {
+  markAllNotificationsRead, markNotificationRead,
+  markAllNotificationsReadAsync, markNotificationReadAsync,
+} from '../redux/ticketSlice';
 
 /**
  * Topbar — Desktop topbar with search, notifications dropdown.
@@ -44,12 +47,12 @@ export default function Topbar({ title = 'Dashboard', subtitle = '', showSearch 
   }, []);
 
   const handleMarkAllRead = useCallback(() => {
-    dispatch(markAllNotificationsRead());
+    dispatch(markAllNotificationsReadAsync());
   }, [dispatch]);
 
   const handleNotifClick = useCallback(
     (id) => {
-      dispatch(markNotificationRead(id));
+      dispatch(markNotificationReadAsync(id));
     },
     [dispatch]
   );

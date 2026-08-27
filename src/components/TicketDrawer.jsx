@@ -4,6 +4,7 @@ import {
   closeTicketDrawer, addComment, rateTicket,
   assignWorkerToTicket, updateTicketPriority, markJobComplete,
   addToast, addAuditEntry,
+  addCommentAsync, rateTicketAsync, assignWorkerAsync, updateTicketPriorityAsync, resolveTicketAsync,
 } from '../redux/ticketSlice';
 
 const CAT_MAP = { Electrical:'⚡', Plumbing:'💧', Furniture:'🪑', Networking:'📡', Appliance:'❄️', Default:'🔧' };
@@ -35,18 +36,29 @@ function CommentThread({ ticketId, comments = [], currentRole }) {
     assets: 'Asset Manager', principal: 'Principal',
   };
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     if (!text.trim()) return;
-    const comment = {
-      id: `C${Date.now()}`,
-      author: currentUser.name,
-      role: roleLabels[currentRole] || currentRole,
-      text: text.trim(),
-      time: 'Just now',
-    };
-    dispatch(addComment({ ticketId, comment }));
+    const author = currentUser.name;
+    const role = roleLabels[currentRole] || currentRole;
+    const commentText = text.trim();
     setText('');
-    dispatch(addToast({ id: `toast-${Date.now()}`, message: 'Comment added', type: 'success' }));
+    try {
+      await dispatch(addCommentAsync({
+        ticketId,
+        comment: { author, role, text: commentText },
+      })).unwrap();
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: 'Comment saved to database', type: 'success' }));
+    } catch {
+      const comment = {
+        id: `C${Date.now()}`,
+        author,
+        role,
+        text: commentText,
+        time: 'Just now',
+      };
+      dispatch(addComment({ ticketId, comment }));
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: 'Comment added', type: 'success' }));
+    }
   }, [text, dispatch, ticketId, currentRole, currentUser.name]);
 
   return (
@@ -96,10 +108,15 @@ function StarRating({ ticketId, existing }) {
   const [hover, setHover] = useState(0);
   const [rated, setRated] = useState(existing || 0);
 
-  const handleRate = (n) => {
+  const handleRate = async (n) => {
     setRated(n);
-    dispatch(rateTicket({ ticketId, rating: n }));
-    dispatch(addToast({ id: `toast-rate-${Date.now()}`, message: `Thanks for rating ${n} ⭐ — feedback submitted!`, type: 'success' }));
+    try {
+      await dispatch(rateTicketAsync({ ticketId, rating: n })).unwrap();
+      dispatch(addToast({ id: `toast-rate-${Date.now()}`, message: `Thanks for rating ${n} ⭐ — feedback saved to database!`, type: 'success' }));
+    } catch {
+      dispatch(rateTicket({ ticketId, rating: n }));
+      dispatch(addToast({ id: `toast-rate-${Date.now()}`, message: `Thanks for rating ${n} ⭐ — feedback submitted!`, type: 'success' }));
+    }
   };
 
   return (
@@ -133,27 +150,46 @@ function QuickActions({ ticket, currentRole, workers, onClose }) {
   const canComplete = currentRole === 'technician';
   const canPriority = ['asst-warden', 'res-warden', 'principal'].includes(currentRole);
 
-  const handleAssign = () => {
+  const handleAssign = async () => {
     if (!selWorker) return;
-    dispatch(assignWorkerToTicket({ ticketId: ticket.id, workerName: selWorker }));
-    dispatch(addAuditEntry({ id: `AL-${Date.now()}`, action: 'Worker Assigned', actor: 'Dr. Meena Sharma (AW)', target: ticket.id, timestamp: new Date().toLocaleString(), category: 'Assignment' }));
-    dispatch(addToast({ id: `toast-${Date.now()}`, message: `${selWorker} assigned to ${ticket.id}`, type: 'success' }));
+    try {
+      await dispatch(assignWorkerAsync({ ticketId: ticket.id, workerName: selWorker, actor: 'Dr. Meena Sharma (AW)' })).unwrap();
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `${selWorker} assigned to ${ticket.id} in database`, type: 'success' }));
+    } catch {
+      dispatch(assignWorkerToTicket({ ticketId: ticket.id, workerName: selWorker }));
+      dispatch(addAuditEntry({ id: `AL-${Date.now()}`, action: 'Worker Assigned', actor: 'Dr. Meena Sharma (AW)', target: ticket.id, timestamp: new Date().toLocaleString(), category: 'Assignment' }));
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `${selWorker} assigned to ${ticket.id}`, type: 'success' }));
+    }
     setShowAssign(false);
     onClose();
   };
 
-  const handleComplete = () => {
-    dispatch(markJobComplete(ticket.id));
-    if (notes.trim()) {
-      dispatch(addComment({ ticketId: ticket.id, comment: { id: `C${Date.now()}`, author: 'Sarathi Kamal', role: 'Technician', text: `✅ Job completed. Notes: ${notes}`, time: 'Just now' } }));
+  const handleComplete = async () => {
+    try {
+      await dispatch(resolveTicketAsync({
+        ticketId: ticket.id,
+        notes: notes || 'Work completed by technician.',
+        actor: 'Sarathi Kamal (Worker)',
+      })).unwrap();
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `${ticket.id} marked complete & saved in database!`, type: 'success' }));
+    } catch {
+      dispatch(markJobComplete(ticket.id));
+      if (notes.trim()) {
+        dispatch(addComment({ ticketId: ticket.id, comment: { id: `C${Date.now()}`, author: 'Sarathi Kamal', role: 'Technician', text: `✅ Job completed. Notes: ${notes}`, time: 'Just now' } }));
+      }
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `${ticket.id} marked complete!`, type: 'success' }));
     }
-    dispatch(addToast({ id: `toast-${Date.now()}`, message: `${ticket.id} marked complete!`, type: 'success' }));
     onClose();
   };
 
-  const handlePriority = (p) => {
-    dispatch(updateTicketPriority({ ticketId: ticket.id, priority: p }));
-    dispatch(addToast({ id: `toast-${Date.now()}`, message: `${ticket.id} priority changed to ${p}`, type: 'info' }));
+  const handlePriority = async (p) => {
+    try {
+      await dispatch(updateTicketPriorityAsync({ ticketId: ticket.id, priority: p })).unwrap();
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `${ticket.id} priority changed to ${p}`, type: 'info' }));
+    } catch {
+      dispatch(updateTicketPriority({ ticketId: ticket.id, priority: p }));
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `${ticket.id} priority changed to ${p}`, type: 'info' }));
+    }
   };
 
   if (ticket.status === 'Resolved') return null;

@@ -1,6 +1,9 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setPage, approveStaffReq, rejectStaffReq, addToast, addAuditEntry, openTicketDrawer } from '../redux/ticketSlice';
+import {
+  setPage, approveStaffReq, rejectStaffReq, addToast, addAuditEntry, openTicketDrawer,
+  approveStaffRequestAsync, rejectStaffRequestAsync, bulkApproveStaffRequestsAsync,
+} from '../redux/ticketSlice';
 import { useTranslation } from '../utils/translations';
 import PhoneFrame from './PhoneFrame';
 import EmptyState from './EmptyState';
@@ -137,9 +140,15 @@ function ResWardenApprovals({ staffRequests, onApprove, onReject, t }) {
   const toggleSelect = (id) => setSelectedIds(prev => { const n = new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; });
   const toggleAll = () => setSelectedIds(prev => prev.size === pending.length ? new Set() : new Set(pending.map(r=>r.id)));
 
-  const handleBulkApprove = () => {
-    selectedIds.forEach(id => onApprove(id));
-    dispatch(addToast({ id: `toast-${Date.now()}`, message: `Approved ${selectedIds.size} staff requests!`, type: 'success' }));
+  const handleBulkApprove = async () => {
+    const ids = Array.from(selectedIds);
+    try {
+      await dispatch(bulkApproveStaffRequestsAsync({ ids, actor: 'Prof. R. Iyer (RW)' })).unwrap();
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `Approved ${ids.length} staff requests in database!`, type: 'success' }));
+    } catch {
+      ids.forEach(id => onApprove(id));
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `Approved ${ids.length} staff requests!`, type: 'success' }));
+    }
     setSelectedIds(new Set());
   };
 
@@ -333,16 +342,26 @@ export default function ResWardenView({ page, isMobile }) {
   const { tickets, staffRequests, budget, auditLog, ticketVolume7d, budgetBurn7d } = useSelector((s) => s.ticketStore);
   const { t } = useTranslation();
 
-  const onApprove = useCallback((id) => {
-    dispatch(approveStaffReq(id));
-    dispatch(addAuditEntry({ id: `AL-${Date.now()}`, action: 'Request Approved', actor: 'Prof. R. Iyer (RW)', target: id, timestamp: new Date().toLocaleString(), category: 'Approval' }));
-    dispatch(addToast({ id: `toast-${Date.now()}`, message: `${id} signed off and approved!`, type: 'success' }));
+  const onApprove = useCallback(async (id) => {
+    try {
+      await dispatch(approveStaffRequestAsync({ id, actor: 'Prof. R. Iyer (RW)' })).unwrap();
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `${id} signed off and approved in database!`, type: 'success' }));
+    } catch {
+      dispatch(approveStaffReq(id));
+      dispatch(addAuditEntry({ id: `AL-${Date.now()}`, action: 'Request Approved', actor: 'Prof. R. Iyer (RW)', target: id, timestamp: new Date().toLocaleString(), category: 'Approval' }));
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `${id} signed off and approved!`, type: 'success' }));
+    }
   }, [dispatch]);
 
-  const onReject = useCallback((id) => {
-    dispatch(rejectStaffReq(id));
-    dispatch(addAuditEntry({ id: `AL-${Date.now()}`, action: 'Request Rejected', actor: 'Prof. R. Iyer (RW)', target: id, timestamp: new Date().toLocaleString(), category: 'Approval' }));
-    dispatch(addToast({ id: `toast-${Date.now()}`, message: `${id} rejected.`, type: 'warn' }));
+  const onReject = useCallback(async (id) => {
+    try {
+      await dispatch(rejectStaffRequestAsync({ id, actor: 'Prof. R. Iyer (RW)' })).unwrap();
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `${id} rejected in database.`, type: 'warn' }));
+    } catch {
+      dispatch(rejectStaffReq(id));
+      dispatch(addAuditEntry({ id: `AL-${Date.now()}`, action: 'Request Rejected', actor: 'Prof. R. Iyer (RW)', target: id, timestamp: new Date().toLocaleString(), category: 'Approval' }));
+      dispatch(addToast({ id: `toast-${Date.now()}`, message: `${id} rejected.`, type: 'warn' }));
+    }
   }, [dispatch]);
 
   const switchPage = useCallback((id)=>dispatch(setPage(id)),[dispatch]);

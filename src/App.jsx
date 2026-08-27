@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setRole, setViewMode } from './redux/ticketSlice';
+import { setRole, setViewMode, fetchInitialData, addToast } from './redux/ticketSlice';
 import { useTranslation } from './utils/translations';
 
 import LoginPage      from './components/LoginPage';
@@ -52,6 +52,18 @@ export default function App() {
   const [showShortcuts, setShowShortcuts] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  /* Fetch initial full-stack data from backend on mount */
+  useEffect(() => {
+    dispatch(fetchInitialData())
+      .unwrap()
+      .then(() => {
+        console.log('✅ Connected to HostelOps SQLite Backend');
+      })
+      .catch((err) => {
+        console.warn('⚠️ Running in offline/fallback mode:', err);
+      });
+  }, [dispatch]);
 
   /* Apply theme classes to <body> */
   useEffect(() => {

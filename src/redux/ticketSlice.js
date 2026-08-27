@@ -1,6 +1,279 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import api from '../services/api';
 
+/* ══════════════════════════════════════════════════════════
+   ASYNC THUNKS — BACKEND DATABASE COMMUNICATION
+══════════════════════════════════════════════════════════ */
+
+// 1. Initial Full Data Hydration from Backend
+export const fetchInitialData = createAsyncThunk(
+  'hostel/fetchInitialData',
+  async (_, { rejectWithValue }) => {
+    try {
+      const [
+        ticketsRes,
+        requestsRes,
+        workersRes,
+        assetsRes,
+        budgetRes,
+        auditRes,
+        notifsRes,
+        commentsRes,
+        ratingsRes,
+        profileRes,
+        analyticsRes,
+      ] = await Promise.all([
+        api.tickets.getAll().catch(() => null),
+        api.requests.getAll().catch(() => null),
+        api.workers.getAll().catch(() => null),
+        api.assets.getAll().catch(() => null),
+        api.budget.get().catch(() => null),
+        api.audit.getAll().catch(() => null),
+        api.notifications.getAll().catch(() => null),
+        api.tickets.getAllComments().catch(() => null),
+        api.tickets.getAllRatings().catch(() => null),
+        api.auth.getProfile().catch(() => null),
+        api.analytics.getOverview().catch(() => null),
+      ]);
+
+      return {
+        tickets: ticketsRes,
+        staffRequests: requestsRes,
+        workers: workersRes,
+        assets: assetsRes,
+        budget: budgetRes,
+        auditLog: auditRes,
+        notifications: notifsRes,
+        ticketComments: commentsRes,
+        ticketRatings: ratingsRes,
+        currentUser: profileRes,
+        analytics: analyticsRes,
+      };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+// 2. Ticket Async Operations
+export const createTicketAsync = createAsyncThunk(
+  'hostel/createTicketAsync',
+  async (ticketData, { rejectWithValue }) => {
+    try {
+      const created = await api.tickets.create(ticketData);
+      return created;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const resolveTicketAsync = createAsyncThunk(
+  'hostel/resolveTicketAsync',
+  async ({ ticketId, notes, actor }, { rejectWithValue }) => {
+    try {
+      const resolved = await api.tickets.resolve(ticketId, { notes, actor });
+      return { ticketId, resolved, notes, actor };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const assignWorkerAsync = createAsyncThunk(
+  'hostel/assignWorkerAsync',
+  async ({ ticketId, workerName, actor }, { rejectWithValue }) => {
+    try {
+      const updated = await api.tickets.assign(ticketId, workerName, actor);
+      return { ticketId, workerName, updated };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const updateTicketPriorityAsync = createAsyncThunk(
+  'hostel/updateTicketPriorityAsync',
+  async ({ ticketId, priority }, { rejectWithValue }) => {
+    try {
+      const updated = await api.tickets.updatePriority(ticketId, priority);
+      return { ticketId, priority, updated };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const bulkUpdateTicketStatusAsync = createAsyncThunk(
+  'hostel/bulkUpdateTicketStatusAsync',
+  async ({ ids, status }, { rejectWithValue }) => {
+    try {
+      await api.tickets.bulkUpdateStatus(ids, status);
+      return { ids, status };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const addCommentAsync = createAsyncThunk(
+  'hostel/addCommentAsync',
+  async ({ ticketId, comment }, { rejectWithValue }) => {
+    try {
+      const created = await api.tickets.addComment(ticketId, comment);
+      return { ticketId, comment: created };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const rateTicketAsync = createAsyncThunk(
+  'hostel/rateTicketAsync',
+  async ({ ticketId, rating }, { rejectWithValue }) => {
+    try {
+      const res = await api.tickets.rate(ticketId, rating);
+      return res;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+// 3. Staff Request Async Operations
+export const submitStaffRequestAsync = createAsyncThunk(
+  'hostel/submitStaffRequestAsync',
+  async (requestData, { rejectWithValue }) => {
+    try {
+      const created = await api.requests.create(requestData);
+      return created;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const approveStaffRequestAsync = createAsyncThunk(
+  'hostel/approveStaffRequestAsync',
+  async ({ id, actor, cost }, { rejectWithValue }) => {
+    try {
+      const approved = await api.requests.approve(id, actor);
+      return { id, approved, cost };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const rejectStaffRequestAsync = createAsyncThunk(
+  'hostel/rejectStaffRequestAsync',
+  async ({ id, actor }, { rejectWithValue }) => {
+    try {
+      const rejected = await api.requests.reject(id, actor);
+      return { id, rejected };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const bulkApproveStaffRequestsAsync = createAsyncThunk(
+  'hostel/bulkApproveStaffRequestsAsync',
+  async ({ ids, actor }, { rejectWithValue }) => {
+    try {
+      const res = await api.requests.bulkApprove(ids, actor);
+      return { ids, totalCost: res.totalCost };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+// 4. Asset Async Operations
+export const updateAssetConditionAsync = createAsyncThunk(
+  'hostel/updateAssetConditionAsync',
+  async ({ tag, condition, actor }, { rejectWithValue }) => {
+    try {
+      const updated = await api.assets.updateCondition(tag, condition, actor);
+      return { tag, condition, updated };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const addAssetMaintenanceRecordAsync = createAsyncThunk(
+  'hostel/addAssetMaintenanceRecordAsync',
+  async ({ tag, record }, { rejectWithValue }) => {
+    try {
+      const updated = await api.assets.addMaintenance(tag, record);
+      return { tag, record, updated };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+// 5. Worker Async Operations
+export const toggleWorkerAvailabilityAsync = createAsyncThunk(
+  'hostel/toggleWorkerAvailabilityAsync',
+  async ({ id, availability }, { rejectWithValue }) => {
+    try {
+      const updated = await api.workers.toggleAvailability(id, availability);
+      return { id, availability, updated };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+// 6. Notification Async Operations
+export const markNotificationReadAsync = createAsyncThunk(
+  'hostel/markNotificationReadAsync',
+  async (id, { rejectWithValue }) => {
+    try {
+      const updated = await api.notifications.markRead(id);
+      return { id, updated };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const markAllNotificationsReadAsync = createAsyncThunk(
+  'hostel/markAllNotificationsReadAsync',
+  async (_, { rejectWithValue }) => {
+    try {
+      const all = await api.notifications.markAllRead();
+      return all;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+// 7. Audit Log Async Operations
+export const addAuditEntryAsync = createAsyncThunk(
+  'hostel/addAuditEntryAsync',
+  async (entry, { rejectWithValue }) => {
+    try {
+      const created = await api.audit.create(entry);
+      return created;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+/* ══════════════════════════════════════════════════════════
+   INITIAL STATE
+══════════════════════════════════════════════════════════ */
 const initialState = {
+  /* ── Network & Connection Status ── */
+  isLoading: false,
+  isBackendConnected: false,
+  apiError: null,
+
   /* ── Navigation & View ── */
   currentRole: 'login',
   currentPage: 'login',
@@ -153,7 +426,6 @@ export const ticketSlice = createSlice({
 
     /* ── Toast System ── */
     addToast: (state, action) => {
-      // payload: { id, message, type ('success'|'error'|'info'|'warn') }
       state.toasts.push(action.payload);
     },
     removeToast: (state, action) => {
@@ -162,7 +434,6 @@ export const ticketSlice = createSlice({
 
     /* ── Comments ── */
     addComment: (state, action) => {
-      // payload: { ticketId, comment: { id, author, role, text, time } }
       const { ticketId, comment } = action.payload;
       if (!state.ticketComments[ticketId]) state.ticketComments[ticketId] = [];
       state.ticketComments[ticketId].push(comment);
@@ -170,7 +441,6 @@ export const ticketSlice = createSlice({
 
     /* ── Satisfaction Rating ── */
     rateTicket: (state, action) => {
-      // payload: { ticketId, rating: 1-5 }
       const { ticketId, rating } = action.payload;
       state.ticketRatings[ticketId] = rating;
     },
@@ -180,7 +450,7 @@ export const ticketSlice = createSlice({
     setColorTheme: (state, action) => { state.colorTheme = action.payload; },
     setLanguage: (state, action) => { state.language = action.payload; },
 
-    /* ── Ticket Actions ── */
+    /* ── Ticket Actions (Sync fallback) ── */
     addTicket: (state, action) => { state.tickets.unshift(action.payload); },
     addStudentTicket: (state, action) => { state.tickets.unshift(action.payload); },
     resolveTicket: (state, action) => {
@@ -236,6 +506,279 @@ export const ticketSlice = createSlice({
 
     /* ── Audit Log ── */
     addAuditEntry: (state, action) => { state.auditLog.unshift(action.payload); },
+  },
+
+  /* ── Extra Reducers for Async Thunk Backend Integration ── */
+  extraReducers: (builder) => {
+    // 1. Initial Data Fetch
+    builder
+      .addCase(fetchInitialData.pending, (state) => {
+        state.isLoading = true;
+        state.apiError = null;
+      })
+      .addCase(fetchInitialData.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isBackendConnected = true;
+
+        const {
+          tickets,
+          staffRequests,
+          workers,
+          assets,
+          budget,
+          auditLog,
+          notifications,
+          ticketComments,
+          ticketRatings,
+          currentUser,
+          analytics,
+        } = action.payload;
+
+        if (tickets && tickets.length) state.tickets = tickets;
+        if (staffRequests && staffRequests.length) state.staffRequests = staffRequests;
+        if (workers && workers.length) state.workers = workers;
+        if (assets && assets.length) state.assets = assets;
+        if (budget) state.budget = budget;
+        if (auditLog && auditLog.length) state.auditLog = auditLog;
+        if (notifications && notifications.length) state.notifications = notifications;
+        if (ticketComments && Object.keys(ticketComments).length) state.ticketComments = ticketComments;
+        if (ticketRatings && Object.keys(ticketRatings).length) state.ticketRatings = ticketRatings;
+        if (currentUser) state.currentUser = { ...state.currentUser, ...currentUser };
+        if (analytics) {
+          if (analytics.ticketVolume7d) state.ticketVolume7d = analytics.ticketVolume7d;
+          if (analytics.ticketVolume30d) state.ticketVolume30d = analytics.ticketVolume30d;
+          if (analytics.budgetBurn7d) state.budgetBurn7d = analytics.budgetBurn7d;
+        }
+      })
+      .addCase(fetchInitialData.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isBackendConnected = false;
+        state.apiError = action.payload || 'Failed to connect to backend';
+      });
+
+    // 2. Create Ticket
+    builder.addCase(createTicketAsync.fulfilled, (state, action) => {
+      const created = action.payload;
+      state.tickets.unshift(created);
+      state.auditLog.unshift({
+        id: `AL-${Date.now()}`,
+        action: 'Ticket Created',
+        actor: `${created.student} (Student)`,
+        target: created.id,
+        timestamp: new Date().toLocaleString(),
+        category: 'Ticket',
+      });
+      state.notifications.unshift({
+        id: `N-${Date.now()}`,
+        message: `New complaint ${created.id} logged in ${created.room} (${created.category})`,
+        type: 'info',
+        isRead: false,
+        time: 'Just now',
+      });
+    });
+
+    // 3. Resolve Ticket
+    builder.addCase(resolveTicketAsync.fulfilled, (state, action) => {
+      const { ticketId, notes, actor } = action.payload;
+      const t = state.tickets.find((tk) => tk.id === ticketId);
+      if (t) t.status = 'Resolved';
+      if (notes) {
+        if (!state.ticketComments[ticketId]) state.ticketComments[ticketId] = [];
+        state.ticketComments[ticketId].push({
+          id: `C${Date.now()}`,
+          author: actor || 'User',
+          role: (actor && actor.includes('Tech')) ? 'Technician' : 'Student',
+          text: notes,
+          time: 'Just now',
+        });
+      }
+      state.auditLog.unshift({
+        id: `AL-${Date.now()}`,
+        action: 'Ticket Resolved',
+        actor: actor || 'User',
+        target: ticketId,
+        timestamp: new Date().toLocaleString(),
+        category: 'Ticket',
+      });
+    });
+
+    // 4. Assign Worker
+    builder.addCase(assignWorkerAsync.fulfilled, (state, action) => {
+      const { ticketId, workerName } = action.payload;
+      const t = state.tickets.find((tk) => tk.id === ticketId);
+      if (t) {
+        t.assignedWorker = workerName;
+        t.status = 'In Progress';
+      }
+      const w = state.workers.find(worker => worker.name === workerName);
+      if (w) w.jobs += 1;
+      state.auditLog.unshift({
+        id: `AL-${Date.now()}`,
+        action: 'Worker Assigned',
+        actor: 'Dr. Meena Sharma (AW)',
+        target: ticketId,
+        timestamp: new Date().toLocaleString(),
+        category: 'Assignment',
+      });
+      state.notifications.unshift({
+        id: `N-${Date.now()}`,
+        message: `Ticket ${ticketId} has been assigned to ${workerName}`,
+        type: 'info',
+        isRead: false,
+        time: 'Just now',
+      });
+    });
+
+    // 5. Update Priority
+    builder.addCase(updateTicketPriorityAsync.fulfilled, (state, action) => {
+      const { ticketId, priority } = action.payload;
+      const t = state.tickets.find((tk) => tk.id === ticketId);
+      if (t) t.priority = priority;
+    });
+
+    // 6. Bulk Update Ticket Status
+    builder.addCase(bulkUpdateTicketStatusAsync.fulfilled, (state, action) => {
+      const { ids, status } = action.payload;
+      state.tickets.forEach((t) => {
+        if (ids.includes(t.id)) {
+          t.status = status;
+        }
+      });
+    });
+
+    // 7. Add Comment
+    builder.addCase(addCommentAsync.fulfilled, (state, action) => {
+      const { ticketId, comment } = action.payload;
+      if (!state.ticketComments[ticketId]) state.ticketComments[ticketId] = [];
+      state.ticketComments[ticketId].push(comment);
+    });
+
+    // 8. Rate Ticket
+    builder.addCase(rateTicketAsync.fulfilled, (state, action) => {
+      const { ticketId, rating } = action.payload;
+      state.ticketRatings[ticketId] = rating;
+    });
+
+    // 9. Submit Staff Request
+    builder.addCase(submitStaffRequestAsync.fulfilled, (state, action) => {
+      const req = action.payload;
+      state.staffRequests.unshift(req);
+      state.auditLog.unshift({
+        id: `AL-${Date.now()}`,
+        action: 'Staff Request Submitted',
+        actor: `${req.submittedBy} (Staff)`,
+        target: req.id,
+        timestamp: new Date().toLocaleString(),
+        category: 'Request',
+      });
+      state.notifications.unshift({
+        id: `N-${Date.now()}`,
+        message: `New ${req.dept} request ${req.id} for ₹${req.cost.toLocaleString()} submitted`,
+        type: 'info',
+        isRead: false,
+        time: 'Just now',
+      });
+    });
+
+    // 10. Approve Staff Request
+    builder.addCase(approveStaffRequestAsync.fulfilled, (state, action) => {
+      const { id, cost } = action.payload;
+      const r = state.staffRequests.find((req) => req.id === id);
+      if (r) r.status = 'Approved';
+      if (cost || (r && r.cost)) {
+        const amount = cost || r.cost;
+        state.budget.spent += amount;
+        state.budget.pending = Math.max(0, state.budget.pending - amount);
+      }
+      state.auditLog.unshift({
+        id: `AL-${Date.now()}`,
+        action: 'Request Approved',
+        actor: 'Prof. R. Iyer (RW)',
+        target: id,
+        timestamp: new Date().toLocaleString(),
+        category: 'Approval',
+      });
+    });
+
+    // 11. Reject Staff Request
+    builder.addCase(rejectStaffRequestAsync.fulfilled, (state, action) => {
+      const { id } = action.payload;
+      const r = state.staffRequests.find((req) => req.id === id);
+      if (r) r.status = 'Rejected';
+      if (r) {
+        state.budget.pending = Math.max(0, state.budget.pending - r.cost);
+      }
+      state.auditLog.unshift({
+        id: `AL-${Date.now()}`,
+        action: 'Request Rejected',
+        actor: 'Prof. R. Iyer (RW)',
+        target: id,
+        timestamp: new Date().toLocaleString(),
+        category: 'Approval',
+      });
+    });
+
+    // 12. Bulk Approve Staff Requests
+    builder.addCase(bulkApproveStaffRequestsAsync.fulfilled, (state, action) => {
+      const { ids, totalCost } = action.payload;
+      state.staffRequests.forEach((r) => {
+        if (ids.includes(r.id)) {
+          r.status = 'Approved';
+        }
+      });
+      if (totalCost) {
+        state.budget.spent += totalCost;
+        state.budget.pending = Math.max(0, state.budget.pending - totalCost);
+      }
+    });
+
+    // 13. Update Asset Condition
+    builder.addCase(updateAssetConditionAsync.fulfilled, (state, action) => {
+      const { tag, condition } = action.payload;
+      const a = state.assets.find((ast) => ast.tag === tag);
+      if (a) a.condition = condition;
+      state.auditLog.unshift({
+        id: `AL-${Date.now()}`,
+        action: 'Asset Condition Updated',
+        actor: 'Dr. Meena Sharma (Asset Mgr)',
+        target: tag,
+        timestamp: new Date().toLocaleString(),
+        category: 'Asset',
+      });
+    });
+
+    // 14. Add Asset Maintenance Record
+    builder.addCase(addAssetMaintenanceRecordAsync.fulfilled, (state, action) => {
+      const { tag, record } = action.payload;
+      const a = state.assets.find((ast) => ast.tag === tag);
+      if (a) {
+        if (!a.maintenanceHistory) a.maintenanceHistory = [];
+        a.maintenanceHistory.unshift(record);
+      }
+    });
+
+    // 15. Toggle Worker Availability
+    builder.addCase(toggleWorkerAvailabilityAsync.fulfilled, (state, action) => {
+      const { id, availability } = action.payload;
+      const w = state.workers.find((wkr) => wkr.id === id || wkr.name === id);
+      if (w) w.availability = availability;
+    });
+
+    // 16. Notification Read Updates
+    builder.addCase(markNotificationReadAsync.fulfilled, (state, action) => {
+      const { id } = action.payload;
+      const n = state.notifications.find((notif) => notif.id === id);
+      if (n) n.isRead = true;
+    });
+
+    builder.addCase(markAllNotificationsReadAsync.fulfilled, (state) => {
+      state.notifications.forEach((n) => { n.isRead = true; });
+    });
+
+    // 17. Add Audit Entry
+    builder.addCase(addAuditEntryAsync.fulfilled, (state, action) => {
+      state.auditLog.unshift(action.payload);
+    });
   },
 });
 
