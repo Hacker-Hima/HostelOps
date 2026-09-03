@@ -1,24 +1,23 @@
 import express from 'express';
-import db from '../db/database.js';
+import { Notification } from '../models/index.js';
 
 const router = express.Router();
 
-function mapNotif(row) {
-  if (!row) return null;
+function mapNotif(doc) {
+  if (!doc) return null;
   return {
-    id: row.id,
-    message: row.message,
-    type: row.type,
-    isRead: Boolean(row.is_read),
-    time: row.time,
+    id: doc.id,
+    message: doc.message,
+    type: doc.type,
+    isRead: Boolean(doc.is_read ?? doc.isRead),
+    time: doc.time,
   };
 }
 
 // GET /api/notifications — Fetch all notifications
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const stmt = db.prepare('SELECT * FROM notifications ORDER BY rowid DESC');
-    const rows = stmt.all();
+    const rows = await Notification.find().sort({ _id: -1 }).lean();
     res.json(rows.map(mapNotif));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -26,11 +25,19 @@ router.get('/', (req, res) => {
 });
 
 // PATCH /api/notifications/:id/read — Mark single notification read
-router.patch('/:id/read', (req, res) => {
+router.patch('/:id/read', async (req, res) => {
   try {
     const { id } = req.params;
-    db.prepare('UPDATE notifications SET is_read = 1 WHERE id = ?').run(id);
-    const updated = db.prepare('SELECT * FROM notifications WHERE id = ?').get(id);
+    const updated = await Notification.findOneAndUpdate(
+      { id },
+      { is_read: 1 },
+      { returnDocument: 'after' }
+    ).lean();
+
+    if (!updated) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+
     res.json(mapNotif(updated));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -38,10 +45,10 @@ router.patch('/:id/read', (req, res) => {
 });
 
 // PATCH /api/notifications/read-all — Mark all notifications read
-router.patch('/read-all', (req, res) => {
+router.patch('/read-all', async (req, res) => {
   try {
-    db.exec('UPDATE notifications SET is_read = 1');
-    const rows = db.prepare('SELECT * FROM notifications ORDER BY rowid DESC').all();
+    await Notification.updateMany({}, { is_read: 1 });
+    const rows = await Notification.find().sort({ _id: -1 }).lean();
     res.json(rows.map(mapNotif));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -49,19 +56,21 @@ router.patch('/read-all', (req, res) => {
 });
 
 // POST /api/notifications — Add notification
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { message, type = 'info', time = 'Just now' } = req.body;
     if (!message) {
       return res.status(400).json({ error: 'message is required' });
     }
-    const id = `N-${Date.now()}`;
-    db.prepare(`
-      INSERT INTO notifications (id, message, type, is_read, time)
-      VALUES (?, ?, ?, 0, ?)
-    `).run(id, message, type, time);
+    const id = req.body.id || `N-${Date.now()}`;
+    const created = await Notification.create({
+      id,
+      message,
+      type,
+      is_read: 0,
+      time,
+    });
 
-    const created = db.prepare('SELECT * FROM notifications WHERE id = ?').get(id);
     res.status(201).json(mapNotif(created));
   } catch (err) {
     res.status(500).json({ error: err.message });

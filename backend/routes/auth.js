@@ -1,5 +1,5 @@
 import express from 'express';
-import db from '../db/database.js';
+import { User } from '../models/index.js';
 
 const router = express.Router();
 
@@ -91,14 +91,13 @@ const DEMO_USERS = {
 };
 
 // GET /api/user/profile — Return current student/user profile
-router.get('/user/profile', (req, res) => {
+router.get('/user/profile', async (req, res) => {
   try {
     const role = req.query.role || 'student';
     if (DEMO_USERS[role]) {
       return res.json(DEMO_USERS[role]);
     }
-    const userStmt = db.prepare('SELECT * FROM users LIMIT 1');
-    const user = userStmt.get();
+    const user = await User.findOne().lean();
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }

@@ -1,49 +1,50 @@
 import express from 'express';
-import db from '../db/database.js';
+import {
+  Ticket,
+  TicketComment,
+  TicketRating,
+  Worker,
+  AuditLog,
+  Notification,
+} from '../models/index.js';
 
 const router = express.Router();
 
-function mapTicket(row) {
-  if (!row) return null;
+function mapTicket(doc) {
+  if (!doc) return null;
   return {
-    id: row.id,
-    title: row.title,
-    student: row.student,
-    room: row.room,
-    category: row.category,
-    priority: row.priority,
-    status: row.status,
-    assignedWorker: row.assigned_worker,
-    assetTag: row.asset_tag,
-    createdAt: row.created_at,
-    creatorRole: row.creator_role,
-    description: row.description,
+    id: doc.id,
+    title: doc.title,
+    student: doc.student,
+    room: doc.room,
+    category: doc.category,
+    priority: doc.priority,
+    status: doc.status,
+    assignedWorker: doc.assigned_worker || doc.assignedWorker || 'Unassigned',
+    assetTag: doc.asset_tag || doc.assetTag || '',
+    createdAt: doc.created_at || doc.createdAt || 'Just now',
+    creatorRole: doc.creator_role || doc.creatorRole || 'Student',
+    description: doc.description || '',
   };
 }
 
 // GET /api/tickets — Fetch all tickets
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { status, category, student } = req.query;
-    let query = 'SELECT * FROM tickets WHERE 1=1';
-    const params = [];
+    const filter = {};
 
     if (status && status !== 'All') {
-      query += ' AND status = ?';
-      params.push(status);
+      filter.status = status;
     }
     if (category && category !== 'All') {
-      query += ' AND category = ?';
-      params.push(category);
+      filter.category = category;
     }
     if (student) {
-      query += ' AND student = ?';
-      params.push(student);
+      filter.student = student;
     }
 
-    query += ' ORDER BY rowid DESC';
-    const stmt = db.prepare(query);
-    const rows = stmt.all(...params);
+    const rows = await Ticket.find(filter).sort({ createdAt: -1, _id: -1 }).lean();
     res.json(rows.map(mapTicket));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -51,10 +52,9 @@ router.get('/', (req, res) => {
 });
 
 // GET /api/tickets/comments/all — Get all comments grouped by ticketId
-router.get('/comments/all', (req, res) => {
+router.get('/comments/all', async (req, res) => {
   try {
-    const stmt = db.prepare('SELECT * FROM ticket_comments ORDER BY created_timestamp ASC');
-    const rows = stmt.all();
+    const rows = await TicketComment.find().sort({ created_timestamp: 1 }).lean();
     const result = {};
     for (const r of rows) {
       if (!result[r.ticket_id]) {
@@ -75,10 +75,9 @@ router.get('/comments/all', (req, res) => {
 });
 
 // GET /api/tickets/ratings/all — Get all ratings grouped by ticketId
-router.get('/ratings/all', (req, res) => {
+router.get('/ratings/all', async (req, res) => {
   try {
-    const stmt = db.prepare('SELECT * FROM ticket_ratings');
-    const rows = stmt.all();
+    const rows = await TicketRating.find().lean();
     const result = {};
     for (const r of rows) {
       result[r.ticket_id] = r.rating;
@@ -90,23 +89,28 @@ router.get('/ratings/all', (req, res) => {
 });
 
 // GET /api/tickets/:id — Single ticket
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
-    const stmt = db.prepare('SELECT * FROM tickets WHERE id = ?');
-    const row = stmt.get(req.params.id);
-    if (!row) {
+    const doc = await Ticket.findOne({ id: req.params.id }).lean();
+    if (!doc) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    const commentsStmt = db.prepare('SELECT * FROM ticket_comments WHERE ticket_id = ? ORDER BY created_timestamp ASC');
-    const comments = commentsStmt.all(req.params.id);
+    const comments = await TicketComment.find({ ticket_id: req.params.id })
+      .sort({ created_timestamp: 1 })
+      .lean();
 
-    const ratingStmt = db.prepare('SELECT rating FROM ticket_ratings WHERE ticket_id = ?');
-    const rating = ratingStmt.get(req.params.id);
+    const rating = await TicketRating.findOne({ ticket_id: req.params.id }).lean();
 
     res.json({
-      ...mapTicket(row),
-      comments: comments.map(c => ({ id: c.id, author: c.author, role: c.role, text: c.text, time: c.time })),
+      ...mapTicket(doc),
+      comments: comments.map(c => ({
+        id: c.id,
+        author: c.author,
+        role: c.role,
+        text: c.text,
+        time: c.time,
+      })),
       rating: rating ? rating.rating : null,
     });
   } catch (err) {
@@ -115,7 +119,7 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /api/tickets — Create new ticket/complaint
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const {
       title,
@@ -138,74 +142,96 @@ router.post('/', (req, res) => {
     const finalAssetTag = assetTag || `QR-${cleanRoomTag}-${cleanCat}-01`;
     const createdAt = 'Just now';
 
-    const insertStmt = db.prepare(`
-      INSERT INTO tickets (id, title, student, room, category, priority, status, assigned_worker, asset_tag, created_at, creator_role, description)
-      VALUES (?, ?, ?, ?, ?, ?, 'Pending', 'Unassigned', ?, ?, 'Student', ?)
-    `);
-
-    insertStmt.run(id, title.trim(), student, room, category, priority, finalAssetTag, createdAt, description || 'No description provided.');
+    const newTicket = await Ticket.create({
+      id,
+      title: title.trim(),
+      student,
+      room,
+      category,
+      priority,
+      status: 'Pending',
+      assigned_worker: 'Unassigned',
+      asset_tag: finalAssetTag,
+      created_at: createdAt,
+      creator_role: 'Student',
+      description: description || 'No description provided.',
+    });
 
     // Log to audit log
-    const auditStmt = db.prepare(`
-      INSERT INTO audit_logs (id, action, actor, target, timestamp, category)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
     const dateStr = new Date().toLocaleString();
-    auditStmt.run(`AL-${Date.now()}`, 'Ticket Created', `${student} (Student)`, id, dateStr, 'Ticket');
+    await AuditLog.create({
+      id: `AL-${Date.now()}`,
+      action: 'Ticket Created',
+      actor: `${student} (Student)`,
+      target: id,
+      timestamp: dateStr,
+      category: 'Ticket',
+    });
 
     // Add notification
-    const notifStmt = db.prepare(`
-      INSERT INTO notifications (id, message, type, is_read, time)
-      VALUES (?, ?, 'info', 0, 'Just now')
-    `);
-    notifStmt.run(`N-${Date.now()}`, `New complaint ${id} logged in ${room} (${category})`);
+    await Notification.create({
+      id: `N-${Date.now()}`,
+      message: `New complaint ${id} logged in ${room} (${category})`,
+      type: 'info',
+      is_read: 0,
+      time: 'Just now',
+    });
 
-    const created = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id);
-    res.status(201).json(mapTicket(created));
+    res.status(201).json(mapTicket(newTicket));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // PATCH /api/tickets/:id/resolve — Mark resolved
-router.patch('/:id/resolve', (req, res) => {
+router.patch('/:id/resolve', async (req, res) => {
   try {
     const { id } = req.params;
     const { notes, actor = 'Student' } = req.body;
 
-    const checkStmt = db.prepare('SELECT * FROM tickets WHERE id = ?');
-    const existing = checkStmt.get(id);
+    const existing = await Ticket.findOne({ id }).lean();
     if (!existing) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    const updateStmt = db.prepare('UPDATE tickets SET status = ? WHERE id = ?');
-    updateStmt.run('Resolved', id);
+    const updated = await Ticket.findOneAndUpdate(
+      { id },
+      { status: 'Resolved' },
+      { returnDocument: 'after' }
+    ).lean();
 
     // If notes provided, append a comment
     if (notes && notes.trim()) {
-      const commentStmt = db.prepare(`
-        INSERT INTO ticket_comments (id, ticket_id, author, role, text, time, created_timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `);
-      commentStmt.run(`C${Date.now()}`, id, actor, actor.includes('Tech') ? 'Technician' : 'Student', notes.trim(), 'Just now', Date.now());
+      await TicketComment.create({
+        id: `C${Date.now()}`,
+        ticket_id: id,
+        author: actor,
+        role: actor.includes('Tech') ? 'Technician' : 'Student',
+        text: notes.trim(),
+        time: 'Just now',
+        created_timestamp: Date.now(),
+      });
     }
 
     // Add audit entry
-    const auditStmt = db.prepare(`
-      INSERT INTO audit_logs (id, action, actor, target, timestamp, category)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-    auditStmt.run(`AL-${Date.now()}`, 'Ticket Resolved', `${actor}`, id, new Date().toLocaleString(), 'Ticket');
+    await AuditLog.create({
+      id: `AL-${Date.now()}`,
+      action: 'Ticket Resolved',
+      actor: `${actor}`,
+      target: id,
+      timestamp: new Date().toLocaleString(),
+      category: 'Ticket',
+    });
 
     // Add notification
-    const notifStmt = db.prepare(`
-      INSERT INTO notifications (id, message, type, is_read, time)
-      VALUES (?, ?, 'success', 0, 'Just now')
-    `);
-    notifStmt.run(`N-${Date.now()}`, `Ticket ${id} (${existing.title}) has been resolved.`);
+    await Notification.create({
+      id: `N-${Date.now()}`,
+      message: `Ticket ${id} (${existing.title}) has been resolved.`,
+      type: 'success',
+      is_read: 0,
+      time: 'Just now',
+    });
 
-    const updated = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id);
     res.json(mapTicket(updated));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -213,7 +239,7 @@ router.patch('/:id/resolve', (req, res) => {
 });
 
 // PATCH /api/tickets/:id/assign — Assign worker
-router.patch('/:id/assign', (req, res) => {
+router.patch('/:id/assign', async (req, res) => {
   try {
     const { id } = req.params;
     const { workerName, actor = 'Dr. Meena Sharma (AW)' } = req.body;
@@ -222,37 +248,39 @@ router.patch('/:id/assign', (req, res) => {
       return res.status(400).json({ error: 'workerName is required' });
     }
 
-    const checkStmt = db.prepare('SELECT * FROM tickets WHERE id = ?');
-    const existing = checkStmt.get(id);
+    const existing = await Ticket.findOne({ id }).lean();
     if (!existing) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    const updateStmt = db.prepare(`
-      UPDATE tickets
-      SET assigned_worker = ?, status = 'In Progress'
-      WHERE id = ?
-    `);
-    updateStmt.run(workerName, id);
+    const updated = await Ticket.findOneAndUpdate(
+      { id },
+      { assigned_worker: workerName, status: 'In Progress' },
+      { returnDocument: 'after' }
+    ).lean();
 
     // Also update worker active jobs count
-    db.prepare('UPDATE workers SET jobs = jobs + 1 WHERE name = ?').run(workerName);
+    await Worker.updateOne({ name: workerName }, { $inc: { jobs: 1 } });
 
     // Add audit log
-    const auditStmt = db.prepare(`
-      INSERT INTO audit_logs (id, action, actor, target, timestamp, category)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-    auditStmt.run(`AL-${Date.now()}`, 'Worker Assigned', actor, id, new Date().toLocaleString(), 'Assignment');
+    await AuditLog.create({
+      id: `AL-${Date.now()}`,
+      action: 'Worker Assigned',
+      actor,
+      target: id,
+      timestamp: new Date().toLocaleString(),
+      category: 'Assignment',
+    });
 
     // Notification
-    const notifStmt = db.prepare(`
-      INSERT INTO notifications (id, message, type, is_read, time)
-      VALUES (?, ?, 'info', 0, 'Just now')
-    `);
-    notifStmt.run(`N-${Date.now()}`, `Your ticket ${id} has been assigned to ${workerName}`);
+    await Notification.create({
+      id: `N-${Date.now()}`,
+      message: `Your ticket ${id} has been assigned to ${workerName}`,
+      type: 'info',
+      is_read: 0,
+      time: 'Just now',
+    });
 
-    const updated = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id);
     res.json(mapTicket(updated));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -260,7 +288,7 @@ router.patch('/:id/assign', (req, res) => {
 });
 
 // PATCH /api/tickets/:id/priority — Update priority
-router.patch('/:id/priority', (req, res) => {
+router.patch('/:id/priority', async (req, res) => {
   try {
     const { id } = req.params;
     const { priority } = req.body;
@@ -269,10 +297,16 @@ router.patch('/:id/priority', (req, res) => {
       return res.status(400).json({ error: 'Valid priority (Low, Medium, High) is required' });
     }
 
-    const updateStmt = db.prepare('UPDATE tickets SET priority = ? WHERE id = ?');
-    updateStmt.run(priority, id);
+    const updated = await Ticket.findOneAndUpdate(
+      { id },
+      { priority },
+      { returnDocument: 'after' }
+    ).lean();
 
-    const updated = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id);
+    if (!updated) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
     res.json(mapTicket(updated));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -280,16 +314,14 @@ router.patch('/:id/priority', (req, res) => {
 });
 
 // PATCH /api/tickets/bulk-status — Update multiple tickets
-router.patch('/bulk-status', (req, res) => {
+router.patch('/bulk-status', async (req, res) => {
   try {
     const { ids, status } = req.body;
     if (!Array.isArray(ids) || !ids.length || !status) {
       return res.status(400).json({ error: 'ids array and status are required' });
     }
 
-    const placeholders = ids.map(() => '?').join(',');
-    const updateStmt = db.prepare(`UPDATE tickets SET status = ? WHERE id IN (${placeholders})`);
-    updateStmt.run(status, ...ids);
+    await Ticket.updateMany({ id: { $in: ids } }, { status });
 
     res.json({ success: true, count: ids.length, updated: ids.length, status });
   } catch (err) {
@@ -298,7 +330,7 @@ router.patch('/bulk-status', (req, res) => {
 });
 
 // POST /api/tickets/:id/comments — Add comment
-router.post('/:id/comments', (req, res) => {
+router.post('/:id/comments', async (req, res) => {
   try {
     const { id: ticketId } = req.params;
     const { author = 'User', role = 'Student', text } = req.body;
@@ -309,11 +341,16 @@ router.post('/:id/comments', (req, res) => {
 
     const commentId = `C${Date.now()}`;
     const time = 'Just now';
-    const stmt = db.prepare(`
-      INSERT INTO ticket_comments (id, ticket_id, author, role, text, time, created_timestamp)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(commentId, ticketId, author, role, text.trim(), time, Date.now());
+
+    await TicketComment.create({
+      id: commentId,
+      ticket_id: ticketId,
+      author,
+      role,
+      text: text.trim(),
+      time,
+      created_timestamp: Date.now(),
+    });
 
     res.status(201).json({
       id: commentId,
@@ -329,7 +366,7 @@ router.post('/:id/comments', (req, res) => {
 });
 
 // POST /api/tickets/:id/rate — Rate ticket
-router.post('/:id/rate', (req, res) => {
+router.post('/:id/rate', async (req, res) => {
   try {
     const { id: ticketId } = req.params;
     const { rating } = req.body;
@@ -339,11 +376,11 @@ router.post('/:id/rate', (req, res) => {
       return res.status(400).json({ error: 'Rating must be an integer between 1 and 5' });
     }
 
-    const stmt = db.prepare(`
-      INSERT OR REPLACE INTO ticket_ratings (ticket_id, rating, created_timestamp)
-      VALUES (?, ?, ?)
-    `);
-    stmt.run(ticketId, num, Date.now());
+    await TicketRating.findOneAndUpdate(
+      { ticket_id: ticketId },
+      { ticket_id: ticketId, rating: num, created_timestamp: Date.now() },
+      { upsert: true, returnDocument: 'after' }
+    );
 
     res.json({ ticketId, rating: num });
   } catch (err) {

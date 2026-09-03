@@ -1,7 +1,7 @@
 {
   "name": "hostelops-backend",
   "version": "1.0.0",
-  "description": "HostelOps Express + SQLite API Server",
+  "description": "HostelOps Express + MongoDB API Server",
   "type": "module",
   "scripts": {
     "start": "node server.js",
@@ -9,7 +9,9 @@
   },
   "dependencies": {
     "cors": "^2.8.6",
-    "express": "^5.2.1"
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mongoose": "^9.9.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

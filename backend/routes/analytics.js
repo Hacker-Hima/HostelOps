@@ -1,42 +1,65 @@
 import express from 'express';
-import db from '../db/database.js';
+import { Ticket, Asset, StaffRequest } from '../models/index.js';
 
 const router = express.Router();
 
 // GET /api/analytics/overview — Comprehensive analytics data for Warden, Res. Warden, and Principal views
-router.get('/overview', (req, res) => {
+router.get('/overview', async (req, res) => {
   try {
-    const totalTickets = db.prepare('SELECT COUNT(*) as c FROM tickets').get().c;
-    const resolvedTickets = db.prepare("SELECT COUNT(*) as c FROM tickets WHERE status = 'Resolved'").get().c;
-    const pendingTickets = db.prepare("SELECT COUNT(*) as c FROM tickets WHERE status = 'Pending'").get().c;
-    const inProgressTickets = db.prepare("SELECT COUNT(*) as c FROM tickets WHERE status = 'In Progress'").get().c;
-    const unassignedTickets = db.prepare("SELECT COUNT(*) as c FROM tickets WHERE assigned_worker = 'Unassigned'").get().c;
+    const totalTickets = await Ticket.countDocuments();
+    const resolvedTickets = await Ticket.countDocuments({ status: 'Resolved' });
+    const pendingTickets = await Ticket.countDocuments({ status: 'Pending' });
+    const inProgressTickets = await Ticket.countDocuments({ status: 'In Progress' });
+    const unassignedTickets = await Ticket.countDocuments({ assigned_worker: 'Unassigned' });
 
-    const totalAssets = db.prepare('SELECT COUNT(*) as c FROM assets').get().c;
-    const pendingReqs = db.prepare("SELECT COUNT(*) as c, COALESCE(SUM(cost), 0) as totalCost FROM staff_requests WHERE status LIKE 'Pending%'").get();
+    const totalAssets = await Asset.countDocuments();
+
+    // Pending requests aggregate
+    const pendingReqsResult = await StaffRequest.aggregate([
+      { $match: { status: { $regex: /^Pending/i } } },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          totalCost: { $sum: '$cost' },
+        },
+      },
+    ]);
+
+    const pendingRequestsCount = pendingReqsResult[0]?.count || 0;
+    const pendingRequestsCost = pendingReqsResult[0]?.totalCost || 0;
 
     // Category breakdown
-    const catRows = db.prepare('SELECT category, COUNT(*) as count FROM tickets GROUP BY category').all();
+    const catRows = await Ticket.aggregate([
+      { $group: { _id: '$category', count: { $sum: 1 } } },
+    ]);
     const categories = {};
     for (const r of catRows) {
-      categories[r.category] = r.count;
+      if (r._id) {
+        categories[r._id] = r.count;
+      }
     }
 
     // Condition breakdown for assets
-    const condRows = db.prepare('SELECT condition, COUNT(*) as count FROM assets GROUP BY condition').all();
+    const condRows = await Asset.aggregate([
+      { $group: { _id: '$condition', count: { $sum: 1 } } },
+    ]);
     const conditions = { Good: 0, 'Needs Repair': 0, Damaged: 0, 'Under Maintenance': 0 };
     for (const r of condRows) {
-      conditions[r.condition] = r.count;
+      if (r._id && conditions[r._id] !== undefined) {
+        conditions[r._id] = r.count;
+      }
     }
 
     // Dynamic block breakdown
-    const ticketsAll = db.prepare('SELECT room FROM tickets').all();
+    const ticketsAll = await Ticket.find({}, 'room').lean();
     const blockCount = { 'Block A': 0, 'Block B': 0, 'Block C': 0, 'Block D': 0 };
     for (const t of ticketsAll) {
-      if (t.room.startsWith('A-') || t.room.startsWith('A')) blockCount['Block A']++;
-      else if (t.room.startsWith('B-') || t.room.startsWith('B')) blockCount['Block B']++;
-      else if (t.room.startsWith('C-') || t.room.startsWith('C')) blockCount['Block C']++;
-      else if (t.room.startsWith('D-') || t.room.startsWith('D')) blockCount['Block D']++;
+      const room = t.room || '';
+      if (room.startsWith('A-') || room.startsWith('A')) blockCount['Block A']++;
+      else if (room.startsWith('B-') || room.startsWith('B')) blockCount['Block B']++;
+      else if (room.startsWith('C-') || room.startsWith('C')) blockCount['Block C']++;
+      else if (room.startsWith('D-') || room.startsWith('D')) blockCount['Block D']++;
     }
 
     res.json({
@@ -46,8 +69,8 @@ router.get('/overview', (req, res) => {
       inProgressTickets,
       unassignedTickets,
       totalAssets,
-      pendingRequestsCount: pendingReqs.c,
-      pendingRequestsCost: pendingReqs.totalCost,
+      pendingRequestsCount,
+      pendingRequestsCost,
       categories,
       conditions,
       blockDistribution: [
