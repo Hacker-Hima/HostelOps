@@ -338,9 +338,9 @@ export default function AssetView({ page, isMobile }) {
   }, [dispatch]);
 
   const LINKS = [
-    { id:'registry',     icon:'📦', label: t('role_assets', 'Registry')     },
-    { id:'scan-sim',     icon:'📷', label: t('scan_qr_asset', 'QR Scanner')   },
-    { id:'asset-detail', icon:'🔍', label: t('view', 'Asset Detail')  },
+    { id:'registry',     icon:'📦', label: t('role_assets', 'Registry'), desc: 'Inventory tagging & lifecycle' },
+    { id:'scan-sim',     icon:'📷', label: t('scan_qr_asset', 'QR Scanner'), desc: 'Scan & verify room barcodes' },
+    { id:'asset-detail', icon:'🔍', label: t('view', 'Asset Detail'), desc: 'Maintenance logs & specs' },
   ];
 
   const renderContent = () => {
@@ -366,24 +366,56 @@ export default function AssetView({ page, isMobile }) {
   }
 
   return (
-    <div style={{width:'min(1100px,100%)',animation:'slideUp 0.3s ease'}}>
+    <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.3s ease' }}>
       <div className="desktop-layout">
         <div className="dark-sidebar">
-          <div className="app-brand"><div className="brand-icon">🏁</div><span className="brand-name">HostelOps</span></div>
+          {/* Sidebar Hero Card */}
+          <div className="sidebar-hero-card">
+            <div className="sidebar-hero-icon">📦</div>
+            <div className="sidebar-hero-info">
+              <div className="sidebar-hero-title">{t('role_assets', 'Asset Registry')}</div>
+              <div className="sidebar-hero-badge">
+                <span className="sidebar-hero-dot"></span>
+                <span>Level 3 • Custodian</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="nav-section-label">Inventory & Audit</div>
+
           <nav className="side-nav">
-            {LINKS.map(l=><div key={l.id} className={`nav-link ${page===l.id?'active':''}`} onClick={()=>switchPage(l.id)}><span className="nav-link-icon">{l.icon}</span>{l.label}</div>)}
+            {LINKS.map(link => {
+              const isActive = page === link.id;
+              return (
+                <div
+                  key={link.id}
+                  className={`nav-card-item ${isActive ? 'active' : ''}`}
+                  onClick={() => switchPage(link.id)}
+                >
+                  <div className="nav-card-icon-box">{link.icon}</div>
+                  <div className="nav-card-body">
+                    <span className="nav-card-title">{link.label}</span>
+                    <span className="nav-card-desc">{link.desc}</span>
+                  </div>
+                  {link.badge && <span className="nav-card-badge">{link.badge}</span>}
+                  <span className="nav-card-arrow">→</span>
+                </div>
+              );
+            })}
           </nav>
+
+          {/* Profile Card Footer */}
           <div
-            className="sidebar-profile"
+            className="sidebar-profile-card"
             onClick={() => dispatch(setProfileModalOpen(true))}
-            style={{ cursor: 'pointer', transition: 'all 0.15s' }}
             title="Click to view & edit profile details"
           >
-            <div className="avatar avatar-sm">MS</div>
-            <div>
-              <strong style={{fontSize:11}}>Dr. Meena Sharma</strong>
-              <span>{t('role_assets', 'Asset Manager')}</span>
+            <div className="sidebar-profile-avatar">MS</div>
+            <div className="sidebar-profile-meta">
+              <span className="sidebar-profile-title">Dr. Meena Sharma</span>
+              <span className="sidebar-profile-subtitle">{t('role_assets', 'Asset Manager')}</span>
             </div>
+            <span className="sidebar-profile-action-btn">⚙️</span>
           </div>
         </div>
         <div className="desktop-content">{renderContent()}</div>

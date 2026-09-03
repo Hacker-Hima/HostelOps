@@ -261,8 +261,8 @@ export default function PrincipalView({ page, isMobile }) {
   }, [dispatch]);
 
   const LINKS = [
-    { id:'dashboard',       icon:'📊', label:'Dashboard'       },
-    { id:'final-approvals', icon:'✅', label: t('final_approvals', 'Final Approvals')  },
+    { id:'dashboard',       icon:'📊', label:'Dashboard', desc: 'Supreme institutional analytics' },
+    { id:'final-approvals', icon:'✅', label: t('final_approvals', 'Final Approvals'), desc: 'Capital expense sign-offs', badge: staffRequests.filter(r => r.status === 'Pending').length ? `${staffRequests.filter(r => r.status === 'Pending').length} Pending` : null },
   ];
 
   const renderContent = () => {
@@ -287,32 +287,56 @@ export default function PrincipalView({ page, isMobile }) {
   }
 
   return (
-    <div style={{ width:'min(1100px,100%)', animation:'slideUp 0.3s ease' }}>
+    <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.3s ease' }}>
       <div className="desktop-layout">
         <div className="dark-sidebar">
-          <div className="app-brand"><div className="brand-icon">👑</div><span className="brand-name">HostelOps</span></div>
-          <nav className="side-nav">
-            {LINKS.map(l=>(
-              <div key={l.id} className={`nav-link ${page===l.id?'active':''}`} onClick={()=>switchPage(l.id)}>
-                <span className="nav-link-icon">{l.icon}</span>{l.label}
+          {/* Sidebar Hero Card */}
+          <div className="sidebar-hero-card">
+            <div className="sidebar-hero-icon">👑</div>
+            <div className="sidebar-hero-info">
+              <div className="sidebar-hero-title">{t('role_principal', 'Principal Office')}</div>
+              <div className="sidebar-hero-badge">
+                <span className="sidebar-hero-dot"></span>
+                <span>Level 5 • Supreme Authority</span>
               </div>
-            ))}
+            </div>
+          </div>
+
+          <div className="nav-section-label">Institutional Governance</div>
+
+          <nav className="side-nav">
+            {LINKS.map(link => {
+              const isActive = page === link.id;
+              return (
+                <div
+                  key={link.id}
+                  className={`nav-card-item ${isActive ? 'active' : ''}`}
+                  onClick={() => switchPage(link.id)}
+                >
+                  <div className="nav-card-icon-box">{link.icon}</div>
+                  <div className="nav-card-body">
+                    <span className="nav-card-title">{link.label}</span>
+                    <span className="nav-card-desc">{link.desc}</span>
+                  </div>
+                  {link.badge && <span className="nav-card-badge">{link.badge}</span>}
+                  <span className="nav-card-arrow">→</span>
+                </div>
+              );
+            })}
           </nav>
+
+          {/* Profile Card Footer */}
           <div
+            className="sidebar-profile-card"
             onClick={() => dispatch(setProfileModalOpen(true))}
-            style={{
-              marginTop:'auto', padding:'10px',
-              background:'linear-gradient(135deg,rgba(239,68,68,0.1),rgba(236,72,153,0.1))',
-              border:'1px solid rgba(239,68,68,0.2)',
-              borderRadius:'var(--radius-md)',
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}
             title="Click to view & edit profile details"
           >
-            <div style={{ fontSize:9, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6 }}>Signed in as</div>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--text-primary)' }}>Dr. K. Sundaram</div>
-            <div style={{ fontSize:10, color:'var(--accent-red)', marginTop:2 }}>{t('role_principal', 'Principal')}</div>
+            <div className="sidebar-profile-avatar" style={{ background: 'linear-gradient(135deg, #ef4444, #ec4899)' }}>KS</div>
+            <div className="sidebar-profile-meta">
+              <span className="sidebar-profile-title">Dr. K. Sundaram</span>
+              <span className="sidebar-profile-subtitle">{t('role_principal', 'Principal')} • Executive Suite</span>
+            </div>
+            <span className="sidebar-profile-action-btn">⚙️</span>
           </div>
         </div>
         <div className="desktop-content">{renderContent()}</div>

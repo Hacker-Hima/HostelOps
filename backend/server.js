@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { connectDB } from './db/database.js';
+import { connectDB, isConnected } from './db/database.js';
 
 import authRoutes from './routes/auth.js';
 import ticketRoutes from './routes/tickets.js';
@@ -44,7 +44,8 @@ app.use((req, res, next) => {
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    database: 'MongoDB',
+    database: isConnected ? 'Connected (MongoDB)' : 'Standby (No MongoDB connection)',
+    isConnected,
     service: 'HostelOps Backend API',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),

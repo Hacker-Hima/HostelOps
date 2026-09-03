@@ -282,6 +282,9 @@ const initialState = {
   viewMode: 'desktop',          // 'mobile' | 'desktop'
   layoutMode: 'bento',          // 'bento' | 'cyber' | 'studio' | 'dual'
   selectedTicketId: null,
+  isLoading: false,
+  isBackendConnected: false,
+  apiError: null,
 
   /* ── Customization & Atmosphere ── */
   themeMode: 'dark',            // 'dark' | 'light'

@@ -31,6 +31,7 @@ import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import HostelBotAI            from './components/HostelBotAI';
 import HostelFloorplan        from './components/HostelFloorplan';
 import UserProfileModal       from './components/UserProfileModal';
+import AestheticLoader        from './components/AestheticLoader';
 
 import './index.css';
 
@@ -59,7 +60,20 @@ const COLOR_GRADS = {
 
 export default function App() {
   const dispatch  = useDispatch();
-  const { currentRole, currentPage, currentUser, viewMode, themeMode, colorTheme, notifications, aiDrawerOpen, floorplanModalOpen, fontStyle, fontSize } = useSelector((s) => s.ticketStore);
+  const {
+    isLoading,
+    currentRole,
+    currentPage,
+    currentUser,
+    viewMode,
+    themeMode,
+    colorTheme,
+    notifications,
+    aiDrawerOpen,
+    floorplanModalOpen,
+    fontStyle,
+    fontSize,
+  } = useSelector((s) => s.ticketStore);
   const { t } = useTranslation();
 
   const [showSettings,  setShowSettings]  = useState(false);
@@ -74,7 +88,7 @@ export default function App() {
     dispatch(fetchInitialData())
       .unwrap()
       .then(() => {
-        console.log('✅ Connected to HostelOps SQLite Backend');
+        console.log('✅ Connected to HostelOps MongoDB Backend');
       })
       .catch((err) => {
         console.warn('⚠️ Running in offline/fallback mode:', err);

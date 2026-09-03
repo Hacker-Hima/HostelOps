@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   setThemeMode,
@@ -9,7 +9,6 @@ import {
   setLayoutMode,
   setLanguage,
   addToast,
-  setRole,
 } from '../redux/ticketSlice';
 import { audioFx } from '../utils/audioFx';
 import { useTranslation } from '../utils/translations';
@@ -28,10 +27,10 @@ const COLOR_THEMES = [
 ];
 
 const LAYOUT_OPTIONS = [
-  { id: 'bento',  icon: '🍱', label: 'Bento Grid', desc: 'Apple-style card clusters' },
+  { id: 'bento',  icon: '🍱', label: 'Bento Grid', desc: 'Card clusters' },
   { id: 'cyber',  icon: '⚡', label: 'Cyber HUD',  desc: 'Sci-fi holographic display' },
   { id: 'studio', icon: '🏛️', label: 'Exec Studio',desc: 'Multi-column command room' },
-  { id: 'dual',   icon: '📱', label: 'Dual View',  desc: 'Side-by-side mobile+desktop' },
+  { id: 'dual',   icon: '📱', label: 'Dual View',  desc: 'Mobile + Desktop layout' },
 ];
 
 const BG_OPTIONS = [
@@ -51,20 +50,21 @@ const LANGUAGES = [
 ];
 
 const TABS = [
-  { id: 'Appearance',   icon: '🎨' },
-  { id: 'Layout',       icon: '🍱' },
-  { id: 'Background',   icon: '✨' },
-  { id: 'Accessibility',icon: '♿' },
-  { id: 'Language',     icon: '🌐' },
-  { id: 'Account',      icon: '👤' },
-  { id: 'About',        icon: 'ℹ️' },
+  { id: 'Appearance',    icon: '🎨' },
+  { id: 'Layout',        icon: '🍱' },
+  { id: 'Notifications', icon: '🔔' },
+  { id: 'Accessibility', icon: '♿' },
+  { id: 'Language',      icon: '🌐' },
+  { id: 'Account',       icon: '👤' },
+  { id: 'About',         icon: 'ℹ️' },
 ];
 
 /* ─── Sub-components ─── */
 function Toggle({ on, onToggle }) {
   return (
     <button
-      className={`settings-toggle${on ? ' on' : ''}`}
+      type="button"
+      className={`toggle-switch ${on ? 'on' : ''}`}
       onClick={onToggle}
       aria-label={on ? 'Enabled' : 'Disabled'}
     />
@@ -87,6 +87,37 @@ function OptionRow({ label, desc, right }) {
   );
 }
 
+/* ── Live Preview Sample Card ── */
+function LivePreviewCard({ themeMode, colorTheme, radiusMode, density }) {
+  return (
+    <div className="settings-preview-panel">
+      <div className="settings-preview-title">Live Preview</div>
+      <div className="preview-card-sample">
+        <div className="preview-card-header">
+          <div className="preview-card-avatar">HO</div>
+          <div>
+            <div className="preview-card-title">TKT-312 · Water Leakage</div>
+            <div className="preview-card-sub">Room A-204 · Sarathi Kamal</div>
+          </div>
+        </div>
+
+        <div className="preview-badge-row">
+          <span className="priority-tag p-high" style={{ fontSize: 9, padding: '2px 6px' }}>🔴 High</span>
+          <span className="badge badge-inprogress" style={{ fontSize: 9, padding: '2px 6px' }}>In Progress</span>
+        </div>
+
+        <button type="button" className="preview-btn-sample">
+          Action Button Example
+        </button>
+      </div>
+
+      <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+        Theme: <strong>{themeMode}</strong> · Color: <strong>{colorTheme}</strong> · Density: <strong>{density}</strong>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Main Component ─── */
 export default function SettingsPanel({ isOpen, onClose }) {
   const dispatch = useDispatch();
@@ -98,30 +129,64 @@ export default function SettingsPanel({ isOpen, onClose }) {
     soundEnabled,
     layoutMode,
     language,
-    currentUser,
-    currentRole,
     isBackendConnected,
+    currentUser,
   } = useSelector((s) => s.ticketStore);
+  const { t } = useTranslation();
 
   const [activeTab, setActiveTab] = useState('Appearance');
-  const { t } = useTranslation();
+  const [density, setDensity] = useState(() => localStorage.getItem('hostelops_density') || 'comfortable');
+  const [reduceMotion, setReduceMotion] = useState(() => localStorage.getItem('hostelops_reduce_motion') === 'true');
+  const [highContrast, setHighContrast] = useState(() => localStorage.getItem('hostelops_high_contrast') === 'true');
+
+  // Notification toggles
+  const [notifTicketAssign, setNotifTicketAssign] = useState(true);
+  const [notifSlaBreach, setNotifSlaBreach] = useState(true);
+  const [notifDigest, setNotifDigest] = useState(false);
+
+  // Apply density class
+  const handleDensityChange = (newDensity) => {
+    setDensity(newDensity);
+    localStorage.setItem('hostelops_density', newDensity);
+    document.body.classList.remove('density-compact', 'density-comfortable', 'density-spacious');
+    document.body.classList.add(`density-${newDensity}`);
+    dispatch(addToast({ id: `den-${Date.now()}`, message: `Density set to ${newDensity}`, type: 'info' }));
+  };
+
+  // Apply reduce motion class
+  const handleReduceMotionToggle = () => {
+    const next = !reduceMotion;
+    setReduceMotion(next);
+    localStorage.setItem('hostelops_reduce_motion', String(next));
+    document.body.classList.toggle('reduce-motion', next);
+    dispatch(addToast({ id: `mot-${Date.now()}`, message: `Reduce motion ${next ? 'enabled' : 'disabled'}`, type: 'info' }));
+  };
+
+  // Apply high contrast class
+  const handleHighContrastToggle = () => {
+    const next = !highContrast;
+    setHighContrast(next);
+    localStorage.setItem('hostelops_high_contrast', String(next));
+    document.body.classList.toggle('high-contrast', next);
+    dispatch(addToast({ id: `hc-${Date.now()}`, message: `High contrast ${next ? 'enabled' : 'disabled'}`, type: 'info' }));
+  };
 
   if (!isOpen) return null;
 
-  const toast = (message, type = 'success') =>
-    dispatch(addToast({ id: Date.now().toString(), message, type }));
+  const toast = (msg, type = 'success') =>
+    dispatch(addToast({ id: `toast-${Date.now()}`, message: msg, type }));
 
-  const click = () => audioFx.playClick?.();
+  const click = () => { if (soundEnabled) audioFx.playClick?.(); };
 
   /* ── APPEARANCE TAB ── */
   const renderAppearance = () => (
     <>
       <div className="settings-section">
-        <SectionTitle>Theme</SectionTitle>
+        <SectionTitle>Theme Mode</SectionTitle>
         <div className="settings-grid-2">
           {[
-            { id: 'light', icon: '☀️', label: 'Light', desc: 'Clean & bright' },
-            { id: 'dark',  icon: '🌙', label: 'Dark',  desc: 'Easy on eyes' },
+            { id: 'light', icon: '☀️', label: 'Light', desc: 'Clean, crisp & bright' },
+            { id: 'dark',  icon: '🌙', label: 'Dark',  desc: 'Easy on eyes with deep navy' },
           ].map((m) => (
             <div
               key={m.id}
@@ -177,249 +242,186 @@ export default function SettingsPanel({ isOpen, onClose }) {
 
   /* ── LAYOUT TAB ── */
   const renderLayout = () => (
-    <div className="settings-section">
-      <SectionTitle>Dashboard Layout</SectionTitle>
-      <div className="settings-grid-2">
-        {LAYOUT_OPTIONS.map((lo) => (
-          <div
-            key={lo.id}
-            className={`settings-option-card${layoutMode === lo.id ? ' active' : ''}`}
-            onClick={() => { dispatch(setLayoutMode(lo.id)); toast(`Layout: ${lo.label}`); click(); }}
-          >
-            <span className="option-icon">{lo.icon}</span>
-            <div className="option-label">{lo.label}</div>
-            <div className="option-desc">{lo.desc}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  /* ── BACKGROUND TAB ── */
-  const renderBackground = () => (
-    <div className="settings-section">
-      <SectionTitle>Background Effect</SectionTitle>
-      <div className="settings-grid-2">
-        {BG_OPTIONS.map((bg) => (
-          <div
-            key={bg.id}
-            className={`settings-option-card${backgroundEffect === bg.id ? ' active' : ''}`}
-            onClick={() => { dispatch(setBackgroundEffect(bg.id)); click(); }}
-          >
-            <span className="option-icon">{bg.icon}</span>
-            <div className="option-label">{bg.label}</div>
-            <div className="option-desc">{bg.desc}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  /* ── ACCESSIBILITY TAB ── */
-  const renderAccessibility = () => (
     <>
       <div className="settings-section">
-        <SectionTitle>Interaction</SectionTitle>
-        <OptionRow
-          label="Sound Effects"
-          desc="UI feedback sounds via Web Audio API"
-          right={
-            <Toggle
-              on={soundEnabled}
-              onToggle={() => {
-                dispatch(setSoundEnabled(!soundEnabled));
-                if (!soundEnabled) audioFx.playSuccess?.();
-              }}
-            />
-          }
-        />
-        <OptionRow
-          label="Compact Mode"
-          desc="Reduce padding and card spacing"
-          right={<Toggle on={false} onToggle={() => toast('Coming soon', 'info')} />}
-        />
-        <OptionRow
-          label="Reduce Motion"
-          desc="Minimize animations and transitions"
-          right={<Toggle on={false} onToggle={() => toast('Coming soon', 'info')} />}
-        />
-      </div>
-      <div className="settings-section">
-        <SectionTitle>Display</SectionTitle>
-        <OptionRow
-          label="High Contrast"
-          desc="Increase border and text contrast ratios"
-          right={<Toggle on={false} onToggle={() => toast('Coming soon', 'info')} />}
-        />
-        <OptionRow
-          label="Large Text"
-          desc="Increase base font size by 20%"
-          right={<Toggle on={false} onToggle={() => toast('Coming soon', 'info')} />}
-        />
-        <OptionRow
-          label="Focus Indicators"
-          desc="Enhanced keyboard focus outlines"
-          right={<Toggle on={true} onToggle={() => toast('Coming soon', 'info')} />}
-        />
-      </div>
-      <div className="settings-section">
-        <SectionTitle>Notifications</SectionTitle>
-        <OptionRow
-          label="Push Notifications"
-          desc="Browser notification alerts for new tickets"
-          right={<Toggle on={false} onToggle={() => toast('Coming soon', 'info')} />}
-        />
-        <OptionRow
-          label="Email Digest"
-          desc="Daily summary email of pending actions"
-          right={<Toggle on={false} onToggle={() => toast('Coming soon', 'info')} />}
-        />
-      </div>
-    </>
-  );
-
-  /* ── LANGUAGE TAB ── */
-  const renderLanguage = () => (
-    <div className="settings-section">
-      <SectionTitle>Interface Language</SectionTitle>
-      <div className="language-grid">
-        {LANGUAGES.map((lang) => (
-          <div
-            key={lang.code}
-            className={`lang-option${language === lang.code ? ' active' : ''}`}
-            onClick={() => { dispatch(setLanguage(lang.code)); click(); toast(`Language: ${lang.label}`); }}
-          >
-            <span className="lang-flag">{lang.flag}</span>
-            <div>
-              <div className="lang-name">{lang.label}</div>
-              <div className="lang-native">{lang.native}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div style={{ marginTop: 16, padding: '11px 13px', background: 'var(--color-info-bg)', borderRadius: 'var(--radius-md)', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-        💡 Full translations available for all interface elements. Backend API responses remain in English.
-      </div>
-    </div>
-  );
-
-  /* ── ACCOUNT TAB ── */
-  const renderAccount = () => {
-    const roleLabel = {
-      student: 'Student', staff: 'Working Staff', 'asst-warden': 'Asst. Warden',
-      'res-warden': 'Res. Warden', technician: 'Technician', assets: 'Asset Manager', principal: 'Principal',
-    }[currentRole] || currentRole;
-
-    return (
-      <>
-        {currentUser && (
-          <>
-            <div className="account-profile-card">
-              <div className="account-avatar">{currentUser.initials || '??'}</div>
-              <div>
-                <div className="account-name">{currentUser.name}</div>
-                <div className="account-role">{roleLabel} · {currentUser.block}</div>
-              </div>
-            </div>
-
-            <div className="settings-section">
-              <SectionTitle>Profile Details</SectionTitle>
-              <div className="account-info-table">
-                {[
-                  { label: 'Roll No.',  value: currentUser.rollNumber },
-                  { label: 'Email',     value: currentUser.email },
-                  { label: 'Phone',     value: currentUser.phone },
-                  { label: 'Room',      value: `${currentUser.room} · ${currentUser.block}` },
-                  { label: 'Floor',     value: currentUser.floor },
-                  { label: 'Role',      value: roleLabel },
-                ].filter(({ value }) => value).map(({ label, value }) => (
-                  <div key={label} className="account-info-row">
-                    <span className="account-info-label">{label}</span>
-                    <span className="account-info-value">{value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-
-        <div className="settings-section">
-          <SectionTitle>Session</SectionTitle>
-          <OptionRow
-            label="Current Role"
-            desc={`Logged in as ${roleLabel}`}
-            right={
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => { dispatch(setRole('login')); onClose(); }}
-              >
-                Switch
-              </button>
-            }
-          />
-          <OptionRow
-            label="Demo Mode"
-            desc="No real credentials — data is pre-seeded"
-            right={<span style={{ fontSize: 11, color: 'var(--color-warning)', fontWeight: 600, padding: '2px 8px', background: 'var(--color-warning-bg)', borderRadius: 'var(--radius-pill)' }}>Active</span>}
-          />
-        </div>
-
-        <button
-          className="btn btn-ghost"
-          style={{ width: '100%', marginTop: 4 }}
-          onClick={() => { dispatch(setRole('login')); onClose(); }}
-        >
-          🔐 Return to Role Selector
-        </button>
-      </>
-    );
-  };
-
-  /* ── ABOUT TAB ── */
-  const renderAbout = () => (
-    <>
-      <div className="settings-section">
-        <SectionTitle>Application</SectionTitle>
-        <div className="account-info-table">
+        <SectionTitle>Layout Density</SectionTitle>
+        <div className="density-option-row">
           {[
-            { label: 'Version',    value: 'HostelOps v4.0' },
-            { label: 'Frontend',   value: 'React 19 + Vite 8 + Redux Toolkit' },
-            { label: 'Backend',    value: 'Express 5 + node:sqlite' },
-            { label: 'Database',   value: 'SQLite · 9 REST API routes' },
-            { label: 'Styling',    value: 'Vanilla CSS + CSS Variables' },
-            { label: 'Node.js',    value: 'v24 (built-in SQLite)' },
-          ].map(({ label, value }) => (
-            <div key={label} className="account-info-row">
-              <span className="account-info-label">{label}</span>
-              <span className="account-info-value">{value}</span>
+            { id: 'compact',     icon: '🔬', label: 'Compact',     sub: 'Tight padding, dense rows' },
+            { id: 'comfortable', icon: '🛋️', label: 'Comfortable', sub: 'Balanced modern SaaS spacing' },
+            { id: 'spacious',    icon: '🌿', label: 'Spacious',    sub: 'Generous padding & gaps' },
+          ].map((d) => (
+            <div
+              key={d.id}
+              className={`density-option ${density === d.id ? 'selected' : ''}`}
+              onClick={() => handleDensityChange(d.id)}
+            >
+              <span className="density-option-icon">{d.icon}</span>
+              <div className="density-option-label">{d.label}</div>
+              <div className="density-option-sub">{d.sub}</div>
             </div>
           ))}
         </div>
       </div>
 
       <div className="settings-section">
-        <SectionTitle>Backend Connection</SectionTitle>
+        <SectionTitle>Dashboard Style</SectionTitle>
+        <div className="settings-grid-2">
+          {LAYOUT_OPTIONS.map((lo) => (
+            <div
+              key={lo.id}
+              className={`settings-option-card${layoutMode === lo.id ? ' active' : ''}`}
+              onClick={() => { dispatch(setLayoutMode(lo.id)); toast(`Layout: ${lo.label}`); click(); }}
+            >
+              <span className="option-icon">{lo.icon}</span>
+              <div className="option-label">{lo.label}</div>
+              <div className="option-desc">{lo.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <SectionTitle>Background Animation</SectionTitle>
+        <div className="settings-grid-2">
+          {BG_OPTIONS.map((bg) => (
+            <div
+              key={bg.id}
+              className={`settings-option-card${backgroundEffect === bg.id ? ' active' : ''}`}
+              onClick={() => { dispatch(setBackgroundEffect(bg.id)); click(); }}
+            >
+              <span className="option-icon">{bg.icon}</span>
+              <div className="option-label">{bg.label}</div>
+              <div className="option-desc">{bg.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+
+  /* ── NOTIFICATIONS TAB ── */
+  const renderNotifications = () => (
+    <div className="settings-section">
+      <SectionTitle>Notification Preferences</SectionTitle>
+
+      <div className="notif-toggle-row">
+        <div className="notif-toggle-info">
+          <span className="notif-toggle-label">Ticket Assignment Pings</span>
+          <span className="notif-toggle-desc">Instant notification when a ticket is assigned to you</span>
+        </div>
+        <Toggle on={notifTicketAssign} onToggle={() => setNotifTicketAssign(p => !p)} />
+      </div>
+
+      <div className="notif-toggle-row">
+        <div className="notif-toggle-info">
+          <span className="notif-toggle-label">SLA Breach Warning Sound</span>
+          <span className="notif-toggle-desc">Audio alert when an urgent complaint exceeds 4 hours</span>
+        </div>
+        <Toggle on={notifSlaBreach} onToggle={() => setNotifSlaBreach(p => !p)} />
+      </div>
+
+      <div className="notif-toggle-row">
+        <div className="notif-toggle-info">
+          <span className="notif-toggle-label">Daily Email Operations Digest</span>
+          <span className="notif-toggle-desc">Morning summary report of pending and resolved items</span>
+        </div>
+        <Toggle on={notifDigest} onToggle={() => setNotifDigest(p => !p)} />
+      </div>
+    </div>
+  );
+
+  /* ── ACCESSIBILITY TAB ── */
+  const renderAccessibility = () => (
+    <div className="settings-section">
+      <SectionTitle>Accessibility & Motion</SectionTitle>
+      <OptionRow
+        label="Sound Effects"
+        desc="UI feedback clicks and success chime via Web Audio"
+        right={
+          <Toggle
+            on={soundEnabled}
+            onToggle={() => {
+              dispatch(setSoundEnabled(!soundEnabled));
+              if (!soundEnabled) audioFx.playSuccess?.();
+            }}
+          />
+        }
+      />
+      <OptionRow
+        label="Reduce Motion"
+        desc="Completely stop CSS animations and continuous transitions"
+        right={<Toggle on={reduceMotion} onToggle={handleReduceMotionToggle} />}
+      />
+      <OptionRow
+        label="High Contrast Mode"
+        desc="Enhance borders and text contrast for better readability"
+        right={<Toggle on={highContrast} onToggle={handleHighContrastToggle} />}
+      />
+    </div>
+  );
+
+  /* ── LANGUAGE TAB ── */
+  const renderLanguage = () => (
+    <div className="settings-section">
+      <SectionTitle>Language / भाषा / மொழி / భాష</SectionTitle>
+      <div className="settings-grid-2">
+        {LANGUAGES.map((lang) => (
+          <div
+            key={lang.code}
+            className={`settings-option-card${language === lang.code ? ' active' : ''}`}
+            onClick={() => { dispatch(setLanguage(lang.code)); click(); toast(`Language: ${lang.label}`); }}
+          >
+            <span className="option-icon">{lang.flag}</span>
+            <div className="option-label">{lang.label}</div>
+            <div className="option-desc">{lang.native}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  /* ── ACCOUNT TAB ── */
+  const renderAccount = () => (
+    <div className="settings-section">
+      <SectionTitle>Session Info</SectionTitle>
+      <div className="account-info-table">
+        {[
+          { label: 'Name',        val: currentUser?.name || 'User' },
+          { label: 'Role',        val: currentUser?.role || 'Guest' },
+          { label: 'Email',       val: currentUser?.email || 'user@hostel.edu' },
+          { label: 'Room / Dept', val: currentUser?.room || 'Campus General' },
+        ].map(({ label, val }) => (
+          <div key={label} className="account-info-row">
+            <span className="account-info-label">{label}</span>
+            <span className="account-info-value">{val}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  /* ── ABOUT TAB ── */
+  const renderAbout = () => (
+    <>
+      <div className="settings-section">
+        <SectionTitle>System Telemetry</SectionTitle>
         <OptionRow
-          label="API Status"
+          label="MongoDB Backend"
           desc="http://localhost:5000/api"
           right={
             <span style={{
-              fontSize: 12, fontWeight: 600,
+              fontSize: 12, fontWeight: 700,
               color: isBackendConnected ? 'var(--color-success)' : 'var(--color-danger)',
               display: 'flex', alignItems: 'center', gap: 5,
               padding: '2px 8px', borderRadius: 'var(--radius-pill)',
               background: isBackendConnected ? 'var(--color-success-bg)' : 'var(--color-danger-bg)',
             }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
-              {isBackendConnected ? 'Connected' : 'Offline'}
+              {isBackendConnected ? 'Live Connection' : 'Offline / Seed State'}
             </span>
           }
         />
-        <div style={{ padding: '10px 12px', background: 'var(--bg-hover)', borderRadius: 'var(--radius-md)', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6, marginTop: 8 }}>
-          {isBackendConnected
-            ? '✅ Live data from SQLite backend. All changes persist across sessions.'
-            : '⚠️ Backend offline. Running with seed data. Start with: cd backend && npm start'}
-        </div>
       </div>
 
       <div className="settings-section">
@@ -428,19 +430,17 @@ export default function SettingsPanel({ isOpen, onClose }) {
           {[
             { key: 'Ctrl + K', action: 'Open Command Palette' },
             { key: '?',        action: 'Show keyboard shortcuts' },
-            { key: 'Esc',      action: 'Close any panel or modal' },
+            { key: 'Esc',      action: 'Close any drawer or panel' },
           ].map(({ key, action }) => (
             <div key={key} className="account-info-row" style={{ justifyContent: 'space-between' }}>
               <span className="account-info-value">{action}</span>
               <kbd style={{
-                fontFamily: 'monospace', fontSize: 11,
+                fontFamily: 'var(--font-mono)', fontSize: 11,
                 padding: '2px 8px',
                 background: 'var(--bg-hover)',
                 border: '1px solid var(--border-default)',
-                borderBottom: '2px solid var(--border-default)',
                 borderRadius: 4,
                 color: 'var(--text-secondary)',
-                whiteSpace: 'nowrap',
               }}>{key}</kbd>
             </div>
           ))}
@@ -452,7 +452,7 @@ export default function SettingsPanel({ isOpen, onClose }) {
   const TAB_RENDERERS = {
     Appearance:    renderAppearance,
     Layout:        renderLayout,
-    Background:    renderBackground,
+    Notifications: renderNotifications,
     Accessibility: renderAccessibility,
     Language:      renderLanguage,
     Account:       renderAccount,
@@ -462,62 +462,52 @@ export default function SettingsPanel({ isOpen, onClose }) {
   return (
     <>
       <div className="settings-overlay" onClick={onClose} />
-      <div className="settings-panel" role="dialog" aria-label="Settings">
-        {/* Header */}
-        <div className="settings-header">
-          <div>
-            <div className="settings-title">⚙️ Settings</div>
-            <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>
-              Customize your HostelOps experience
-            </div>
-          </div>
-          <button className="settings-close-btn" onClick={onClose} aria-label="Close settings">✕</button>
-        </div>
+      <div className="settings-modal-wide" role="dialog" aria-modal="true" aria-label="HostelOps Preferences & Settings">
 
-        {/* Tab bar */}
-        <div className="settings-tabs" role="tablist">
+        {/* ── Left Tab Rail ── */}
+        <div className="settings-tab-rail">
+          <div className="settings-tab-rail-title">Preferences</div>
           {TABS.map((tab) => (
             <button
               key={tab.id}
-              className={`settings-tab${activeTab === tab.id ? ' active' : ''}`}
+              type="button"
+              className={`settings-tab-item ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
-              role="tab"
-              aria-selected={activeTab === tab.id}
             >
-              {tab.icon} {tab.id}
+              <span className="settings-tab-icon">{tab.icon}</span>
+              <span>{tab.id}</span>
             </button>
           ))}
         </div>
 
-        {/* Tab content */}
-        <div className="settings-body" role="tabpanel">
+        {/* ── Center Content Area ── */}
+        <div className="settings-content-area">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div>
+              <h2 className="settings-section-head">{activeTab}</h2>
+              <p className="settings-section-sub">Configure your workspace settings</p>
+            </div>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={onClose}
+              aria-label="Close settings"
+            >
+              ✕
+            </button>
+          </div>
+
           {TAB_RENDERERS[activeTab]?.()}
         </div>
 
-        {/* Footer */}
-        <div className="settings-footer">
-          <span className="settings-version">
-            v4.0 ·{' '}
-            <span style={{ color: isBackendConnected ? 'var(--color-success)' : 'var(--color-warning)' }}>
-              {isBackendConnected ? '● Live' : '● Offline'}
-            </span>
-          </span>
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => {
-              dispatch(setThemeMode('light'));
-              dispatch(setColorTheme('purple'));
-              dispatch(setRadiusMode('smooth'));
-              dispatch(setSoundEnabled(true));
-              dispatch(setBackgroundEffect('particles'));
-              dispatch(setLanguage('en'));
-              click();
-              toast('Settings reset to defaults');
-            }}
-          >
-            Reset defaults
-          </button>
-        </div>
+        {/* ── Right Live Preview Pane ── */}
+        <LivePreviewCard
+          themeMode={themeMode}
+          colorTheme={colorTheme}
+          radiusMode={radiusMode}
+          density={density}
+        />
+
       </div>
     </>
   );

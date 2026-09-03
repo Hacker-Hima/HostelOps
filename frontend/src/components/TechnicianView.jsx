@@ -7,6 +7,7 @@ import {
 import { useTranslation } from '../utils/translations';
 import PhoneFrame from './PhoneFrame';
 import EmptyState from './EmptyState';
+import { JobStopwatchTimer, PreventiveMaintenanceSchedule } from './TechnicianFeatures';
 
 const PRIORITY_ICON = { High:'🔴', Medium:'🟡', Low:'🟢' };
 const CAT_MAP = { Electrical:'⚡', Plumbing:'💧', Furniture:'🪑', Networking:'📡', Appliance:'❄️', Default:'🔧' };
@@ -223,6 +224,12 @@ function TechnicianJobDetail({ tickets, selectedJobId, onBack, onComplete, compl
           <div className="upload-box" onClick={()=>setPhotoUploaded(p=>!p)} style={{marginBottom:10,borderColor:photoUploaded?'var(--accent-green)':undefined}}>
             {photoUploaded ? '✅ "After" Photo Attached (IMG_20260824_work.jpg)' : '📸 Tap to capture / upload "After" repair photo'}
           </div>
+
+          {/* Work Duration Logger */}
+          <div style={{ marginBottom: 12 }}>
+            <JobStopwatchTimer onInsertDuration={(dur) => setNotes(prev => prev ? `${prev}\n${dur}` : dur)} />
+          </div>
+
           <textarea
             className="form-textarea"
             rows={3}
@@ -298,6 +305,7 @@ export default function TechnicianView({ page, isMobile }) {
     switch (activePage) {
       case 'feed':       return <TechnicianFeed jobs={myJobs} onViewJob={handleViewJob} completedIds={completedIds} onOpenDrawer={handleOpenDrawer} t={t} />;
       case 'schedule':   return <TechnicianSchedule jobs={myJobs} onViewJob={handleViewJob} t={t} />;
+      case 'preventive': return <PreventiveMaintenanceSchedule />;
       case 'job-detail': return <TechnicianJobDetail tickets={tickets} selectedJobId={selectedJobId} onBack={()=>switchPage('feed')} onComplete={handleComplete} completedIds={completedIds} t={t} />;
       default:           return <TechnicianFeed jobs={myJobs} onViewJob={handleViewJob} completedIds={completedIds} onOpenDrawer={handleOpenDrawer} t={t} />;
     }
@@ -305,7 +313,12 @@ export default function TechnicianView({ page, isMobile }) {
 
   const bottomNav = (
     <>
-      {[{id:'feed',icon:'📋',label:t('job_feed', 'Feed')},{id:'schedule',icon:'📅',label:t('schedule', 'Schedule')},{id:'job-detail',icon:'🔧',label:t('proof_of_work', 'Proof')}].map(tab=>(
+      {[
+        {id:'feed',icon:'📋',label:t('job_feed', 'Feed')},
+        {id:'schedule',icon:'📅',label:t('schedule', 'Schedule')},
+        {id:'preventive',icon:'🗓️',label:'PM'},
+        {id:'job-detail',icon:'🔧',label:t('proof_of_work', 'Proof')}
+      ].map(tab=>(
         <div key={tab.id} className={`phone-nav-item ${activePage===tab.id?'active':''}`} onClick={()=>switchPage(tab.id)}>
           <span className="nav-ico">{tab.icon}</span><span className="nav-lbl">{tab.label}</span>
         </div>
@@ -318,26 +331,60 @@ export default function TechnicianView({ page, isMobile }) {
   }
 
   return (
-    <div style={{width:'min(960px,100%)',animation:'slideUp 0.3s ease'}}>
+    <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.3s ease' }}>
       <div className="desktop-layout">
-        <div className="dark-sidebar" style={{ width: 220 }}>
-          <div className="app-brand"><div className="brand-icon">⚡</div><span className="brand-name">{t('role_technician', 'Technician')}</span></div>
+        <div className="dark-sidebar">
+          {/* Sidebar Hero Card */}
+          <div className="sidebar-hero-card">
+            <div className="sidebar-hero-icon">⚡</div>
+            <div className="sidebar-hero-info">
+              <div className="sidebar-hero-title">{t('role_technician', 'Maintenance Desk')}</div>
+              <div className="sidebar-hero-badge">
+                <span className="sidebar-hero-dot"></span>
+                <span>Level 2 • Field Tech</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="nav-section-label">Field Operations</div>
+
           <nav className="side-nav">
-            {[{id:'feed',icon:'📋',label:t('job_feed', 'Job Feed')},{id:'schedule',icon:'📅',label:t('schedule', 'Schedule')},{id:'job-detail',icon:'🔧',label:t('proof_of_work', 'Job Detail & Proof')}].map(l=>(
-              <div key={l.id} className={`nav-link ${page===l.id?'active':''}`} onClick={()=>dispatch(setPage(l.id))}><span className="nav-link-icon">{l.icon}</span>{l.label}</div>
-            ))}
+            {[
+              { id: 'feed', icon: '📋', label: t('job_feed', 'Job Feed'), desc: 'Assigned active dispatches' },
+              { id: 'schedule', icon: '📅', label: t('schedule', 'Schedule'), desc: "Today's maintenance tasks" },
+              { id: 'preventive', icon: '🗓️', label: 'Preventive Maint.', desc: 'Quarterly hardware checks' },
+              { id: 'job-detail', icon: '🔧', label: t('proof_of_work', 'Job Detail & Proof'), desc: 'Upload resolution proof' }
+            ].map((link) => {
+              const isActive = page === link.id;
+              return (
+                <div
+                  key={link.id}
+                  className={`nav-card-item ${isActive ? 'active' : ''}`}
+                  onClick={() => dispatch(setPage(link.id))}
+                >
+                  <div className="nav-card-icon-box">{link.icon}</div>
+                  <div className="nav-card-body">
+                    <span className="nav-card-title">{link.label}</span>
+                    <span className="nav-card-desc">{link.desc}</span>
+                  </div>
+                  <span className="nav-card-arrow">→</span>
+                </div>
+              );
+            })}
           </nav>
+
+          {/* Profile Card Footer */}
           <div
-            className="sidebar-profile"
+            className="sidebar-profile-card"
             onClick={() => dispatch(setProfileModalOpen(true))}
-            style={{ cursor: 'pointer', transition: 'all 0.15s' }}
             title="Click to view & edit profile details"
           >
-            <div className="avatar avatar-sm" style={{background:'linear-gradient(135deg,#f97316,#eab308)'}}>⚡</div>
-            <div>
-              <strong style={{fontSize:11}}>Sarathi Kamal</strong>
-              <span>{t('role_technician', 'Electrician')}</span>
+            <div className="sidebar-profile-avatar" style={{ background: 'linear-gradient(135deg,#f97316,#eab308)' }}>⚡</div>
+            <div className="sidebar-profile-meta">
+              <span className="sidebar-profile-title">Sarathi Kamal</span>
+              <span className="sidebar-profile-subtitle">Electrician & MEP Lead</span>
             </div>
+            <span className="sidebar-profile-action-btn">⚙️</span>
           </div>
         </div>
         <div className="desktop-content">{renderContent()}</div>

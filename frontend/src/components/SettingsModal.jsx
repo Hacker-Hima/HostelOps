@@ -426,7 +426,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                       color: isBackendConnected ? 'var(--accent-green)' : 'var(--text-muted)' }}>
                       <span style={{ width:7, height:7, borderRadius:'50%',
                         background: isBackendConnected ? 'var(--accent-green)' : 'var(--text-muted)', display:'inline-block' }} />
-                      {isBackendConnected ? 'Connected — SQLite' : 'Offline Mode'}
+                      {isBackendConnected ? 'Connected — MongoDB' : 'Offline Mode'}
                     </span>
                   </div>
                   <div style={{ fontSize:11, color:'var(--text-muted)' }}>

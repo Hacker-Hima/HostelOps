@@ -4,6 +4,7 @@ import { setPage, addToast, addAuditEntry, submitStaffRequestAsync, setProfileMo
 import { useTranslation } from '../utils/translations';
 import PhoneFrame from './PhoneFrame';
 import EmptyState from './EmptyState';
+import StaffDailyChecklist from './StaffChecklist';
 
 const stepState = (status) => {
   if (status === 'Approved')           return ['done','done','done'];
@@ -276,6 +277,7 @@ export default function StaffView({ page, isMobile }) {
   const renderContent = () => {
     switch (activePage) {
       case 'dashboard':      return <StaffDashboard    staffRequests={staffRequests} onNewRequest={() => switchPage('new-request')} onViewStatus={() => switchPage('request-detail')} t={t} />;
+      case 'checklist':      return <StaffDailyChecklist />;
       case 'new-request':    return <StaffNewRequest   onSubmit={handleNewRequest} onCancel={() => switchPage('dashboard')} t={t} />;
       case 'request-detail': return <StaffRequestDetail staffRequests={staffRequests} t={t} />;
       default:               return <StaffDashboard    staffRequests={staffRequests} onNewRequest={() => switchPage('new-request')} onViewStatus={() => switchPage('request-detail')} t={t} />;
@@ -284,7 +286,12 @@ export default function StaffView({ page, isMobile }) {
 
   const bottomNav = (
     <>
-      {[{id:'dashboard',icon:'🏠',label:'Home'},{id:'new-request',icon:'➕',label:'New Req'},{id:'request-detail',icon:'📋',label:'Status'}].map((tab)=>(
+      {[
+        {id:'dashboard',icon:'🏠',label:'Home'},
+        {id:'checklist',icon:'✅',label:'Checklist'},
+        {id:'new-request',icon:'➕',label:'New Req'},
+        {id:'request-detail',icon:'📋',label:'Status'},
+      ].map((tab)=>(
         <div key={tab.id} className={`phone-nav-item ${activePage===tab.id?'active':''}`} onClick={()=>switchPage(tab.id)}>
           <span className="nav-ico">{tab.icon}</span><span className="nav-lbl">{tab.label}</span>
         </div>
@@ -297,28 +304,60 @@ export default function StaffView({ page, isMobile }) {
   }
 
   return (
-    <div style={{ width:'min(960px,100%)', animation:'slideUp 0.3s ease' }}>
+    <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.3s ease' }}>
       <div className="desktop-layout">
-        <div className="dark-sidebar" style={{ width: 220 }}>
-          <div className="app-brand"><div className="brand-icon">👨‍🍳</div><span className="brand-name">{t('role_staff', 'Staff')}</span></div>
-          <nav className="side-nav">
-            {[{id:'dashboard',icon:'🏠',label:'Dashboard'},{id:'new-request',icon:'➕',label:'New Request'},{id:'request-detail',icon:'📋',label:'Request Status'}].map((l)=>(
-              <div key={l.id} className={`nav-link ${page===l.id?'active':''}`} onClick={()=>dispatch(setPage(l.id))}>
-                <span className="nav-link-icon">{l.icon}</span>{l.label}
+        <div className="dark-sidebar">
+          {/* Sidebar Hero Card */}
+          <div className="sidebar-hero-card">
+            <div className="sidebar-hero-icon">👨‍🍳</div>
+            <div className="sidebar-hero-info">
+              <div className="sidebar-hero-title">{t('role_staff', 'Operations Staff')}</div>
+              <div className="sidebar-hero-badge">
+                <span className="sidebar-hero-dot"></span>
+                <span>Level 2 • Operations</span>
               </div>
-            ))}
+            </div>
+          </div>
+
+          <div className="nav-section-label">Operations Console</div>
+
+          <nav className="side-nav">
+            {[
+              { id: 'dashboard', icon: '🏠', label: 'Dashboard', desc: 'Requisitions & inventory' },
+              { id: 'checklist', icon: '✅', label: 'Daily Checklist', desc: 'Sanitation & kitchen tasks' },
+              { id: 'new-request', icon: '➕', label: 'New Request', desc: 'Create grocery/cleaning order' },
+              { id: 'request-detail', icon: '📋', label: 'Request Status', desc: 'Approval & delivery pipeline' }
+            ].map((link) => {
+              const isActive = page === link.id;
+              return (
+                <div
+                  key={link.id}
+                  className={`nav-card-item ${isActive ? 'active' : ''}`}
+                  onClick={() => dispatch(setPage(link.id))}
+                >
+                  <div className="nav-card-icon-box">{link.icon}</div>
+                  <div className="nav-card-body">
+                    <span className="nav-card-title">{link.label}</span>
+                    <span className="nav-card-desc">{link.desc}</span>
+                  </div>
+                  <span className="nav-card-arrow">→</span>
+                </div>
+              );
+            })}
           </nav>
+
+          {/* Profile Card Footer */}
           <div
-            className="sidebar-profile"
+            className="sidebar-profile-card"
             onClick={() => dispatch(setProfileModalOpen(true))}
-            style={{ cursor: 'pointer', transition: 'all 0.15s' }}
             title="Click to view & edit profile details"
           >
-            <div className="avatar avatar-sm" style={{background:'linear-gradient(135deg,#f97316,#eab308)'}}>👨‍🍳</div>
-            <div>
-              <strong style={{fontSize:11}}>Sanji</strong>
-              <span>Mess & Dining</span>
+            <div className="sidebar-profile-avatar" style={{ background: 'linear-gradient(135deg,#f97316,#eab308)' }}>👨‍🍳</div>
+            <div className="sidebar-profile-meta">
+              <span className="sidebar-profile-title">Chef Sanji</span>
+              <span className="sidebar-profile-subtitle">Mess & Dining Lead</span>
             </div>
+            <span className="sidebar-profile-action-btn">⚙️</span>
           </div>
         </div>
         <div className="desktop-content">{renderContent()}</div>

@@ -19,17 +19,26 @@ dotenv.config();
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hostelops';
 
+export let isConnected = false;
+
 /**
  * Connect to MongoDB and initialize seeds
  */
 export async function connectDB() {
   try {
-    const conn = await mongoose.connect(MONGODB_URI);
+    const conn = await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 4000,
+    });
+    isConnected = true;
     console.log(`✅ MongoDB Connected: ${conn.connection.host}:${conn.connection.port}/${conn.connection.name}`);
     await seedInitialData();
   } catch (error) {
-    console.error(`❌ MongoDB Connection Error: ${error.message}`);
-    process.exit(1);
+    isConnected = false;
+    console.warn(`⚠️ MongoDB Connection Notice: ${error.message}`);
+    console.log(`💡 To connect MongoDB:`);
+    console.log(`   1. Start local MongoDB service (e.g., mongod or 'net start MongoDB')`);
+    console.log(`   2. OR set MONGODB_URI in backend/.env with your MongoDB Atlas Cloud URI`);
+    console.log(`📡 Backend server will continue running and retry connection.`);
   }
 }
 

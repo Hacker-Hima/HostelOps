@@ -8,6 +8,7 @@ import api from '../services/api';
 import { useTranslation } from '../utils/translations';
 import PhoneFrame from './PhoneFrame';
 import EmptyState from './EmptyState';
+import { EmergencySpeedDial, StudentNotices, StudentMessMenu } from './StudentFeatures';
 
 const CAT_MAP = { Electrical:'⚡', Plumbing:'💧', Furniture:'🪑', Networking:'📡', Appliance:'❄️', Default:'🔧' };
 const CATS = [
@@ -25,6 +26,8 @@ function StudentBottomNav({ active, onSwitch, t }) {
   const tabs = [
     { id:'home',    icon:'🏠', label: t('role_student', 'Home') },
     { id:'tickets', icon:'📄', label: t('my_tickets', 'Tickets') },
+    { id:'notices', icon:'📢', label: 'Notices' },
+    { id:'mess',    icon:'🍽️', label: 'Mess' },
     { id:'scan-qr', icon:'📷', label: t('scan_qr_asset', 'Scan QR') },
     { id:'profile', icon:'👤', label: t('profile', 'Profile') },
   ];
@@ -84,6 +87,9 @@ function StudentHome({ tickets, currentUser, onNewTicket, onViewTickets, onViewT
           </div>
         ))}
       </div>
+
+      {/* Emergency Speed Dial */}
+      <EmergencySpeedDial />
 
       <div className="section-title">{t('recent_activity', 'Recent Activity')}</div>
       {myTickets.length === 0 ? (
@@ -578,7 +584,7 @@ export default function StudentView({ page, isMobile }) {
   const { t } = useTranslation();
   const [mobileTab, setMobileTab] = useState('home');
 
-  const activePage = isMobile ? mobileTab : page;
+  const activePage = isMobile ? mobileTab : (page === 'dashboard' ? 'home' : (page || 'home'));
 
   const handleSwitchPage = useCallback((id) => {
     if (isMobile) setMobileTab(id);
@@ -632,11 +638,15 @@ export default function StudentView({ page, isMobile }) {
     }
   }, [dispatch, currentUser, handleSwitchPage]);
 
+  const myTickets = useMemo(() => tickets.filter(tk => tk.student === currentUser.name), [tickets, currentUser]);
+
   const renderPageContent = () => {
     const common = { tickets, currentUser, t };
     switch (activePage) {
       case 'home':       return <StudentHome {...common} onNewTicket={() => handleSwitchPage('new-ticket')} onViewTickets={() => handleSwitchPage('tickets')} onViewTicket={handleViewTicket} />;
       case 'tickets':    return <StudentTickets {...common} onNewTicket={() => handleSwitchPage('new-ticket')} onViewTicket={handleViewTicket} onResolve={handleResolve} />;
+      case 'notices':    return <StudentNotices />;
+      case 'mess':       return <StudentMessMenu />;
       case 'new-ticket': return <StudentNewTicket {...common} onSubmit={handleTicketSubmit} onCancel={() => handleSwitchPage('tickets')} />;
       case 'scan-qr':    return <StudentScanQR t={t} />;
       case 'profile':    return <StudentProfile {...common} />;
@@ -657,25 +667,64 @@ export default function StudentView({ page, isMobile }) {
   }
 
   return (
-    <div style={{ width:'min(960px,100%)', animation:'slideUp 0.3s ease' }}>
+    <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.3s ease' }}>
       <div className="desktop-layout">
-        <div className="dark-sidebar" style={{ width: 230 }}>
-          <div className="app-brand"><div className="brand-icon">🎓</div><span className="brand-name">{t('role_student', 'Student')}</span></div>
-          <nav className="side-nav">
-            {[{id:'home',icon:'🏠',label:t('role_student', 'Home')},{id:'tickets',icon:'📄',label:t('my_tickets', 'My Tickets')},{id:'new-ticket',icon:'➕',label:t('raise_complaint', 'New Complaint')},{id:'scan-qr',icon:'📷',label:t('scan_qr_asset', 'QR Scanner')},{id:'profile',icon:'👤',label:t('profile', 'Profile')}].map((link) => (
-              <div key={link.id} className={`nav-link ${page===link.id?'active':''}`} onClick={() => dispatch(setPage(link.id))}>
-                <span className="nav-link-icon">{link.icon}</span>{link.label}
+        <div className="dark-sidebar">
+          {/* Sidebar Hero Card */}
+          <div className="sidebar-hero-card">
+            <div className="sidebar-hero-icon">🎓</div>
+            <div className="sidebar-hero-info">
+              <div className="sidebar-hero-title">{t('role_student', 'Student Resident')}</div>
+              <div className="sidebar-hero-badge">
+                <span className="sidebar-hero-dot"></span>
+                <span>Level 1 • Verified</span>
               </div>
-            ))}
+            </div>
+          </div>
+
+          <div className="nav-section-label">Workspace Navigation</div>
+
+          <nav className="side-nav">
+            {[
+              { id: 'home', icon: '🏠', label: t('role_student', 'Overview'), desc: 'Dashboard & live stats' },
+              { id: 'tickets', icon: '📄', label: t('my_tickets', 'My Tickets'), desc: 'Complaints & resolution', badge: myTickets.filter(t => t.status !== 'Resolved').length ? `${myTickets.filter(t => t.status !== 'Resolved').length} Active` : null },
+              { id: 'notices', icon: '📢', label: 'Notices & Bulletins', desc: 'Hostel circulars & events' },
+              { id: 'mess', icon: '🍽️', label: 'Daily Mess Menu', desc: "Today's meal timings" },
+              { id: 'new-ticket', icon: '➕', label: t('raise_complaint', 'New Complaint'), desc: 'Submit quick repair ticket' },
+              { id: 'scan-qr', icon: '📷', label: t('scan_qr_asset', 'QR Scanner'), desc: 'Scan room asset barcodes' },
+              { id: 'profile', icon: '👤', label: t('profile', 'My Profile'), desc: `${currentUser.room} • ${currentUser.block}` }
+            ].map((link) => {
+              const isActive = activePage === link.id;
+              return (
+                <div
+                  key={link.id}
+                  className={`nav-card-item ${isActive ? 'active' : ''}`}
+                  onClick={() => handleSwitchPage(link.id)}
+                >
+                  <div className="nav-card-icon-box">{link.icon}</div>
+                  <div className="nav-card-body">
+                    <span className="nav-card-title">{link.label}</span>
+                    <span className="nav-card-desc">{link.desc}</span>
+                  </div>
+                  {link.badge && <span className="nav-card-badge">{link.badge}</span>}
+                  <span className="nav-card-arrow">→</span>
+                </div>
+              );
+            })}
           </nav>
+
+          {/* Profile Card Footer */}
           <div
-            className="sidebar-profile"
+            className="sidebar-profile-card"
             onClick={() => dispatch(setProfileModalOpen(true))}
-            style={{ cursor: 'pointer', transition: 'all 0.15s' }}
             title="Click to view & edit profile details"
           >
-            <div className="avatar avatar-sm">{currentUser.initials}</div>
-            <div><strong style={{ fontSize:11 }}>{currentUser.name}</strong><span>{currentUser.room}</span></div>
+            <div className="sidebar-profile-avatar">{currentUser.initials}</div>
+            <div className="sidebar-profile-meta">
+              <span className="sidebar-profile-title">{currentUser.name}</span>
+              <span className="sidebar-profile-subtitle">{currentUser.room} • {currentUser.block}</span>
+            </div>
+            <span className="sidebar-profile-action-btn">⚙️</span>
           </div>
         </div>
         <div className="desktop-content">

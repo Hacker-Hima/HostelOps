@@ -7,6 +7,7 @@ import {
 import { useTranslation } from '../utils/translations';
 import PhoneFrame from './PhoneFrame';
 import EmptyState from './EmptyState';
+import KanbanBoard from './KanbanBoard';
 
 const statusBadge = (s) => {
   const m = { Pending:'badge-pending', 'In Progress':'badge-inprogress', Resolved:'badge-resolved' };
@@ -111,6 +112,7 @@ function WardenDashboard({ tickets, staffRequests, workers, onFilterByStatus, t 
 /* ── Page: Complaints ── */
 function WardenComplaints({ tickets, workers, onAssign, initialStatusFilter, t }) {
   const dispatch = useDispatch();
+  const [viewMode, setViewMode] = useState('table'); // 'table' | 'kanban'
   const [search, setSearch]   = useState('');
   const [statusF, setStatusF] = useState(initialStatusFilter || 'All');
   const [catF, setCatF]       = useState('All');
@@ -175,32 +177,60 @@ function WardenComplaints({ tickets, workers, onAssign, initialStatusFilter, t }
           <h2>{t('student_complaints', 'Student Complaints')}</h2>
           <div className="page-subtitle">{filtered.length} of {tickets.length} shown</div>
         </div>
-        <div style={{ display:'flex', gap:8 }}>
-          <input className="search-bar" placeholder={`🔍 ${t('search', 'Search...')}`} value={search} onChange={(e)=>setSearch(e.target.value)} />
-          <select className="form-select" style={{width:130}} value={statusF} onChange={(e)=>setStatusF(e.target.value)}>
-            {['All','Pending','In Progress','Resolved'].map(s=><option key={s} value={s}>{s === 'All' ? t('all', 'All') : t(s.toLowerCase().replace(' ', '_'), s)}</option>)}
-          </select>
-          <select className="form-select" style={{width:130}} value={catF} onChange={(e)=>setCatF(e.target.value)}>
-            {['All','Electrical','Plumbing','Furniture','Networking','Appliance'].map(c=><option key={c} value={c}>{c === 'All' ? t('all', 'All') : c}</option>)}
-          </select>
-          <button className="btn btn-ghost btn-sm" onClick={() => exportCSV(filtered, 'complaints.csv')} title={t('export_csv', 'Export CSV')}>📥 CSV</button>
+        <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+          {/* View Toggle */}
+          <div className="kanban-view-toggle">
+            <button
+              type="button"
+              className={`kanban-toggle-btn ${viewMode === 'table' ? 'active' : ''}`}
+              onClick={() => setViewMode('table')}
+              title="Table View"
+            >
+              📋 Table
+            </button>
+            <button
+              type="button"
+              className={`kanban-toggle-btn ${viewMode === 'kanban' ? 'active' : ''}`}
+              onClick={() => setViewMode('kanban')}
+              title="Kanban Board View"
+            >
+              📊 Kanban
+            </button>
+          </div>
+
+          {viewMode === 'table' && (
+            <>
+              <input className="search-bar" placeholder={`🔍 ${t('search', 'Search...')}`} value={search} onChange={(e)=>setSearch(e.target.value)} />
+              <select className="form-select" style={{width:130}} value={statusF} onChange={(e)=>setStatusF(e.target.value)}>
+                {['All','Pending','In Progress','Resolved'].map(s=><option key={s} value={s}>{s === 'All' ? t('all', 'All') : t(s.toLowerCase().replace(' ', '_'), s)}</option>)}
+              </select>
+              <select className="form-select" style={{width:130}} value={catF} onChange={(e)=>setCatF(e.target.value)}>
+                {['All','Electrical','Plumbing','Furniture','Networking','Appliance'].map(c=><option key={c} value={c}>{c === 'All' ? t('all', 'All') : c}</option>)}
+              </select>
+              <button className="btn btn-ghost btn-sm" onClick={() => exportCSV(filtered, 'complaints.csv')} title={t('export_csv', 'Export CSV')}>📥 CSV</button>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Bulk action bar */}
-      {selectedIds.size > 0 && (
-        <div className="bulk-bar">
-          <span className="bulk-count">{selectedIds.size} selected</span>
-          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-            <select className="form-select" style={{width:160}} value={bulkStatus} onChange={e=>setBulkStatus(e.target.value)}>
-              <option value="">Change status…</option>
-              {['Pending','In Progress','Resolved'].map(s=><option key={s} value={s}>{t(s.toLowerCase().replace(' ', '_'), s)}</option>)}
-            </select>
-            <button className="btn btn-primary btn-sm" disabled={!bulkStatus} onClick={handleBulkStatusApply}>{t('save', 'Apply')}</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setSelectedIds(new Set())}>✕ {t('cancel', 'Clear')}</button>
-          </div>
-        </div>
-      )}
+      {viewMode === 'kanban' ? (
+        <KanbanBoard tickets={tickets} currentRole="warden" />
+      ) : (
+        <>
+          {/* Bulk action bar */}
+          {selectedIds.size > 0 && (
+            <div className="bulk-bar">
+              <span className="bulk-count">{selectedIds.size} selected</span>
+              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                <select className="form-select" style={{width:160}} value={bulkStatus} onChange={e=>setBulkStatus(e.target.value)}>
+                  <option value="">Change status…</option>
+                  {['Pending','In Progress','Resolved'].map(s=><option key={s} value={s}>{t(s.toLowerCase().replace(' ', '_'), s)}</option>)}
+                </select>
+                <button className="btn btn-primary btn-sm" disabled={!bulkStatus} onClick={handleBulkStatusApply}>{t('save', 'Apply')}</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setSelectedIds(new Set())}>✕ {t('cancel', 'Clear')}</button>
+              </div>
+            </div>
+          )}
 
       {filtered.length === 0 ? (
         <EmptyState icon="🎫" title="No complaints found" subtitle="Try adjusting your filters or search term." />
@@ -236,6 +266,8 @@ function WardenComplaints({ tickets, workers, onAssign, initialStatusFilter, t }
             ))}
           </tbody>
         </table>
+      )}
+        </>
       )}
 
       {/* Assign Modal */}
@@ -357,10 +389,10 @@ export default function WardenView({ page, isMobile }) {
   }, [switchPage]);
 
   const LINKS = [
-    { id:'dashboard', icon:'📊', label:'Dashboard' },
-    { id:'complaints',icon:'💬', label: t('student_complaints', 'Complaints') },
-    { id:'staff-reqs',icon:'📋', label: t('staff_requirements', 'Staff Reqs')  },
-    { id:'workers',   icon:'👷', label: t('workers_directory', 'Workers')     },
+    { id:'dashboard', icon:'📊', label:'Dashboard', desc: 'SLA metrics & live overview' },
+    { id:'complaints',icon:'💬', label: t('student_complaints', 'Complaints'), desc: 'Assign & track repair tickets', badge: tickets.filter(t => t.status !== 'Resolved').length ? `${tickets.filter(t => t.status !== 'Resolved').length} Open` : null },
+    { id:'staff-reqs',icon:'📋', label: t('staff_requirements', 'Staff Reqs'), desc: 'Inventory & facility approvals' },
+    { id:'workers',   icon:'👷', label: t('workers_directory', 'Workers'), desc: 'On-duty technician roster' },
   ];
 
   const renderContent = () => {
@@ -387,24 +419,56 @@ export default function WardenView({ page, isMobile }) {
   }
 
   return (
-    <div style={{ width:'min(1100px,100%)', animation:'slideUp 0.3s ease' }}>
+    <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.3s ease' }}>
       <div className="desktop-layout">
         <div className="dark-sidebar">
-          <div className="app-brand"><div className="brand-icon">🏫</div><span className="brand-name">HostelOps</span></div>
+          {/* Sidebar Hero Card */}
+          <div className="sidebar-hero-card">
+            <div className="sidebar-hero-icon">🏫</div>
+            <div className="sidebar-hero-info">
+              <div className="sidebar-hero-title">{t('role_asst_warden', 'Warden Dispatch')}</div>
+              <div className="sidebar-hero-badge">
+                <span className="sidebar-hero-dot"></span>
+                <span>Level 3 • Dispatcher</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="nav-section-label">Administration</div>
+
           <nav className="side-nav">
-            {LINKS.map(l=><div key={l.id} className={`nav-link ${page===l.id?'active':''}`} onClick={()=>switchPage(l.id)}><span className="nav-link-icon">{l.icon}</span>{l.label}</div>)}
+            {LINKS.map(link => {
+              const isActive = page === link.id;
+              return (
+                <div
+                  key={link.id}
+                  className={`nav-card-item ${isActive ? 'active' : ''}`}
+                  onClick={() => switchPage(link.id)}
+                >
+                  <div className="nav-card-icon-box">{link.icon}</div>
+                  <div className="nav-card-body">
+                    <span className="nav-card-title">{link.label}</span>
+                    <span className="nav-card-desc">{link.desc}</span>
+                  </div>
+                  {link.badge && <span className="nav-card-badge">{link.badge}</span>}
+                  <span className="nav-card-arrow">→</span>
+                </div>
+              );
+            })}
           </nav>
+
+          {/* Profile Card Footer */}
           <div
-            className="sidebar-profile"
+            className="sidebar-profile-card"
             onClick={() => dispatch(setProfileModalOpen(true))}
-            style={{ cursor: 'pointer', transition: 'all 0.15s' }}
             title="Click to view & edit profile details"
           >
-            <div className="avatar avatar-sm">MS</div>
-            <div>
-              <strong style={{fontSize:11}}>Dr. Meena Sharma</strong>
-              <span>{t('role_asst_warden', 'Asst. Warden')}</span>
+            <div className="sidebar-profile-avatar">MS</div>
+            <div className="sidebar-profile-meta">
+              <span className="sidebar-profile-title">Dr. Meena Sharma</span>
+              <span className="sidebar-profile-subtitle">{t('role_asst_warden', 'Assistant Warden')} • Off. 101</span>
             </div>
+            <span className="sidebar-profile-action-btn">⚙️</span>
           </div>
         </div>
         <div className="desktop-content">{renderContent()}</div>

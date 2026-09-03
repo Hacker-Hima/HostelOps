@@ -238,6 +238,33 @@ function QuickActions({ ticket, currentRole, workers, onClose }) {
   );
 }
 
+/* ── Horizontal Ticket Lifecycle Stepper ── */
+function TicketLifecycleStepper({ ticket, rating }) {
+  const steps = [
+    { label: 'Reported', done: true, current: ticket.status === 'Pending' && ticket.assignedWorker === 'Unassigned' },
+    { label: 'Assigned', done: ticket.assignedWorker !== 'Unassigned', current: ticket.status === 'Pending' && ticket.assignedWorker !== 'Unassigned' },
+    { label: 'In Progress', done: ticket.status === 'In Progress' || ticket.status === 'Resolved', current: ticket.status === 'In Progress' },
+    { label: 'Resolved', done: ticket.status === 'Resolved', current: ticket.status === 'Resolved' && !rating },
+    { label: 'Verified', done: Boolean(rating), current: false },
+  ];
+
+  return (
+    <div className="ticket-lifecycle-stepper" role="group" aria-label="Ticket progress lifecycle">
+      {steps.map((step, idx) => {
+        const stateClass = step.done ? 'done' : step.current ? 'active' : 'pending';
+        return (
+          <div key={step.label} className={`lifecycle-step ${stateClass}`}>
+            <div className="lifecycle-dot">
+              {step.done ? '✓' : idx + 1}
+            </div>
+            <span className="lifecycle-step-label">{step.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ══════════════ MAIN DRAWER ══════════════ */
 export default function TicketDrawer() {
   const dispatch = useDispatch();
@@ -279,6 +306,12 @@ export default function TicketDrawer() {
           <div style={{ padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>Ticket not found.</div>
         ) : (
           <div className="ticket-drawer-body">
+            {/* Horizontal Lifecycle Stepper */}
+            <div className="drawer-section" style={{ paddingBottom: 6 }}>
+              <div className="section-title" style={{ marginBottom: 4 }}>📈 Lifecycle Status</div>
+              <TicketLifecycleStepper ticket={ticket} rating={rating} />
+            </div>
+
             {/* Description */}
             <div className="drawer-section">
               <div className="section-title">{CAT_MAP[ticket.category] || CAT_MAP.Default} Description</div>

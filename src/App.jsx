@@ -58,7 +58,7 @@ export default function App() {
     dispatch(fetchInitialData())
       .unwrap()
       .then(() => {
-        console.log('✅ Connected to HostelOps SQLite Backend');
+        console.log('✅ Connected to HostelOps MongoDB Backend');
       })
       .catch((err) => {
         console.warn('⚠️ Running in offline/fallback mode:', err);
