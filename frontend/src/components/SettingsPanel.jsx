@@ -405,26 +405,6 @@ export default function SettingsPanel({ isOpen, onClose }) {
   const renderAbout = () => (
     <>
       <div className="settings-section">
-        <SectionTitle>System Telemetry</SectionTitle>
-        <OptionRow
-          label="MongoDB Backend"
-          desc="http://localhost:5000/api"
-          right={
-            <span style={{
-              fontSize: 12, fontWeight: 700,
-              color: isBackendConnected ? 'var(--color-success)' : 'var(--color-danger)',
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '2px 8px', borderRadius: 'var(--radius-pill)',
-              background: isBackendConnected ? 'var(--color-success-bg)' : 'var(--color-danger-bg)',
-            }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
-              {isBackendConnected ? 'Live Connection' : 'Offline / Seed State'}
-            </span>
-          }
-        />
-      </div>
-
-      <div className="settings-section">
         <SectionTitle>Keyboard Shortcuts</SectionTitle>
         <div className="account-info-table">
           {[

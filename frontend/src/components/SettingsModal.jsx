@@ -418,22 +418,6 @@ export default function SettingsModal({ isOpen, onClose }) {
                   </div>
                 </div>
 
-                <div style={{ padding:'14px 16px', borderRadius:'var(--radius-md)',
-                  background:'var(--bg-card)', border:'1px solid var(--border-default)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-                    <span style={{ fontSize:12.5, fontWeight:700, color:'var(--text-primary)' }}>Backend Status</span>
-                    <span style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, fontWeight:700,
-                      color: isBackendConnected ? 'var(--accent-green)' : 'var(--text-muted)' }}>
-                      <span style={{ width:7, height:7, borderRadius:'50%',
-                        background: isBackendConnected ? 'var(--accent-green)' : 'var(--text-muted)', display:'inline-block' }} />
-                      {isBackendConnected ? 'Connected — MongoDB' : 'Offline Mode'}
-                    </span>
-                  </div>
-                  <div style={{ fontSize:11, color:'var(--text-muted)' }}>
-                    Express API at <code style={{ fontSize:10, color:'var(--text-accent)', background:'var(--bg-glass)', padding:'1px 5px', borderRadius:4 }}>http://localhost:5000/api</code>
-                  </div>
-                </div>
-
                 <div>
                   <SectionLabel>Actions</SectionLabel>
                   {[

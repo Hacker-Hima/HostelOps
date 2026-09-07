@@ -287,7 +287,7 @@ const initialState = {
   apiError: null,
 
   /* ── Customization & Atmosphere ── */
-  themeMode: 'dark',            // 'dark' | 'light'
+  themeMode: 'light',           // 'dark' | 'light'
   colorTheme: 'purple',         // 'purple'|'cyan'|'green'|'orange'|'red'|'pink'|'cyber'|'gold'|'frost'
   backgroundEffect: 'particles',// 'particles' | 'grid' | 'aura' | 'minimal'
   radiusMode: 'smooth',         // 'sharp' | 'smooth' | 'round'
