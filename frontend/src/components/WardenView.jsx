@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import {
   setPage, assignWorkerToTicket, addToast, openTicketDrawer, addAuditEntry,
   assignWorkerAsync, bulkUpdateTicketStatusAsync, setProfileModalOpen,
+  clearHandover, clearHandoverAsync,
 } from '../redux/ticketSlice';
 import { useTranslation } from '../utils/translations';
 import PhoneFrame from './PhoneFrame';
@@ -371,10 +372,121 @@ function WardenWorkers({ workers, t }) {
   );
 }
 
+/* ── Page: Handover Clearances ── */
+function WardenHandovers({ handovers = [] }) {
+  const dispatch = useDispatch();
+
+  const handleClear = async (handoverId, penalty = 0) => {
+    dispatch(clearHandover({ handoverId, status: penalty > 0 ? 'Damage Penalty' : 'Cleared', clearedBy: 'Dr. Meena Sharma', penaltyAmount: penalty }));
+    dispatch(addToast({
+      id: `toast-${Date.now()}`,
+      message: `Handover #${handoverId} approved & cleared!`,
+      type: 'success',
+    }));
+    try {
+      await dispatch(clearHandoverAsync({ id: handoverId, data: { status: penalty > 0 ? 'Damage Penalty' : 'Cleared', clearedBy: 'Dr. Meena Sharma', penaltyAmount: penalty } })).unwrap();
+    } catch (_) {}
+  };
+
+  return (
+    <>
+      <div className="desktop-topbar">
+        <div>
+          <h2>Student Room Handover Clearances</h2>
+          <div className="page-subtitle">Inspect returned room assets and sign off clearance certificates</div>
+        </div>
+      </div>
+
+      {handovers.length === 0 ? (
+        <EmptyState icon="📋" title="No checkout clearances pending" subtitle="All vacating students have been cleared." />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {handovers.map((h) => (
+            <div
+              key={h.handoverId || h.handover_id}
+              style={{
+                background: 'var(--bg-card)',
+                border: '1.5px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 18,
+                boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Student: {h.studentName} (Roll: {h.studentRoll})
+                  </h4>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                    Room: <strong>{h.room}</strong> • Block: <strong>{h.block}</strong> • Date: {h.date}
+                  </div>
+                </div>
+                <span className={h.status === 'Cleared' ? 'badge badge-resolved' : 'badge badge-pending'}>
+                  {h.status}
+                </span>
+              </div>
+
+              {/* Items Table */}
+              <div style={{ background: 'var(--bg-glass)', borderRadius: 8, padding: 12, marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>
+                  Verified Room Assets
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {(h.items || []).map((item) => (
+                    <div
+                      key={item.tag}
+                      style={{
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 6,
+                        padding: '4px 10px',
+                        fontSize: 11,
+                      }}
+                    >
+                      <strong style={{ color: 'var(--text-primary)' }}>{item.name}</strong> ({item.tag}) —{' '}
+                      <span style={{ color: item.condition === 'Good' ? '#10b981' : '#f59e0b' }}>{item.condition}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                  Remarks: <em>"{h.remarks || 'Standard room checkout verification'}"</em>
+                </div>
+                {h.status !== 'Cleared' && (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      style={{ color: '#ef4444' }}
+                      onClick={() => {
+                        const fine = prompt('Enter penalty deduction amount in ₹ (e.g. 500 for fan damage):', '300');
+                        if (fine) handleClear(h.handoverId || h.handover_id, Number(fine));
+                      }}
+                    >
+                      ⚠️ Fine & Clear
+                    </button>
+                    <button
+                      className="btn btn-success btn-sm"
+                      onClick={() => handleClear(h.handoverId || h.handover_id, 0)}
+                    >
+                      ✓ Approve 100% Clearance
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 /* ══════════════ MAIN EXPORT ══════════════ */
 export default function WardenView({ page, isMobile }) {
   const dispatch = useDispatch();
-  const { tickets, staffRequests, workers } = useSelector((s) => s.ticketStore);
+  const { tickets, staffRequests, workers, handovers } = useSelector((s) => s.ticketStore);
   const { t } = useTranslation();
   const [statusFilter, setStatusFilter] = useState('All');
 
@@ -391,7 +503,8 @@ export default function WardenView({ page, isMobile }) {
   const LINKS = [
     { id:'dashboard', icon:'📊', label:'Dashboard', desc: 'SLA metrics & live overview' },
     { id:'complaints',icon:'💬', label: t('student_complaints', 'Complaints'), desc: 'Assign & track repair tickets', badge: tickets.filter(t => t.status !== 'Resolved').length ? `${tickets.filter(t => t.status !== 'Resolved').length} Open` : null },
-    { id:'staff-reqs',icon:'📋', label: t('staff_requirements', 'Staff Reqs'), desc: 'Inventory & facility approvals' },
+    { id:'handovers', icon:'📋', label:'Handover Clearances', desc:'Vacate & checkout approvals' },
+    { id:'staff-reqs',icon:'📦', label: 'Procurement Requests', desc: 'Equipment & asset sign-offs' },
     { id:'workers',   icon:'👷', label: t('workers_directory', 'Workers'), desc: 'On-duty technician roster' },
   ];
 
@@ -399,6 +512,7 @@ export default function WardenView({ page, isMobile }) {
     switch (page) {
       case 'dashboard':  return <WardenDashboard  tickets={tickets} staffRequests={staffRequests} workers={workers} onFilterByStatus={handleKpiFilter} t={t} />;
       case 'complaints': return <WardenComplaints tickets={tickets} workers={workers} onAssign={handleAssign} initialStatusFilter={statusFilter} t={t} />;
+      case 'handovers':  return <WardenHandovers  handovers={handovers || []} />;
       case 'staff-reqs': return <WardenStaffReqs  staffRequests={staffRequests} t={t} />;
       case 'workers':    return <WardenWorkers    workers={workers} t={t} />;
       default:           return <WardenDashboard  tickets={tickets} staffRequests={staffRequests} workers={workers} onFilterByStatus={handleKpiFilter} t={t} />;

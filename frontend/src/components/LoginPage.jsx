@@ -15,14 +15,6 @@ const ROLES = [
     user: { name: 'Himachalam', initials: 'HC', room: 'A-204', block: 'Block A', floor: 'Floor 2', rollNumber: '21CS204', email: 'hima@hostel.edu', phone: '+91 98765 43210', role: 'student' },
   },
   {
-    id: 'staff', category: 'residents', icon: '👨‍🍳',
-    name: 'Working Staff', sampleId: 'STAFF-409', samplePass: 'staff@123',
-    clearance: 'Level 2 - Operations',
-    desc: 'Raise equipment & grocery requisition tickets, track the approval pipeline.',
-    color: '#f97316', bgColor: 'rgba(249,115,22,0.15)', borderColor: 'rgba(249,115,22,0.3)',
-    user: { name: 'Sanji', initials: 'SJ', room: 'Mess Staff Qtrs', block: 'Block A', floor: 'Ground Floor', rollNumber: 'STAFF-409', email: 'sanji@hostel.edu', phone: '+91 98765 12345', role: 'staff' },
-  },
-  {
     id: 'asst-warden', category: 'admin', icon: '🏫',
     name: 'Assistant Warden', sampleId: 'AW-002', samplePass: 'warden@123',
     clearance: 'Level 3 - Dispatcher',
@@ -65,7 +57,7 @@ const ROLES = [
 ];
 
 const CATEGORY_LABELS = {
-  residents:   'Residents & Staff',
+  residents:   'Residents',
   admin:       'Administration',
   maintenance: 'Maintenance & Assets',
 };

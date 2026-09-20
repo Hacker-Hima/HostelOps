@@ -3,12 +3,14 @@ import { useSelector, useDispatch } from 'react-redux';
 import {
   addTicket, resolveTicket, setPage, selectTicket, addToast, openTicketDrawer,
   createTicketAsync, resolveTicketAsync, updateUserProfile, setProfileModalOpen,
+  submitHandover, submitHandoverAsync,
 } from '../redux/ticketSlice';
 import api from '../services/api';
 import { useTranslation } from '../utils/translations';
 import PhoneFrame from './PhoneFrame';
 import EmptyState from './EmptyState';
-import { EmergencySpeedDial, StudentNotices, StudentMessMenu } from './StudentFeatures';
+import { EmergencySpeedDial, StudentNotices } from './StudentFeatures';
+import { getAssetImage, IMAGES } from '../utils/assetImages';
 
 const CAT_MAP = { Electrical:'⚡', Plumbing:'💧', Furniture:'🪑', Networking:'📡', Appliance:'❄️', Default:'🔧' };
 const CATS = [
@@ -25,9 +27,9 @@ const statusBadge = (s) => {
 function StudentBottomNav({ active, onSwitch, t }) {
   const tabs = [
     { id:'home',    icon:'🏠', label: t('role_student', 'Home') },
+    { id:'assets',  icon:'🪑', label: 'My Assets' },
     { id:'tickets', icon:'📄', label: t('my_tickets', 'Tickets') },
     { id:'notices', icon:'📢', label: 'Notices' },
-    { id:'mess',    icon:'🍽️', label: 'Mess' },
     { id:'scan-qr', icon:'📷', label: t('scan_qr_asset', 'Scan QR') },
     { id:'profile', icon:'👤', label: t('profile', 'Profile') },
   ];
@@ -193,22 +195,232 @@ function StudentTickets({ tickets, currentUser, onNewTicket, onViewTicket, onRes
   );
 }
 
+/* ══════════════ PAGE: MY ROOM ASSETS & HANDOVER ══════════════ */
+function StudentRoomAssets({ currentUser, onReportAsset, t }) {
+  const dispatch = useDispatch();
+  const { assets = [], handovers = [] } = useSelector((s) => s.ticketStore);
+
+  const myAssets = useMemo(() => {
+    return assets.filter(
+      (a) =>
+        (a.assignedStudent && a.assignedStudent.roll === currentUser.rollNumber) ||
+        (a.assignedStudent && a.assignedStudent.name === currentUser.name) ||
+        (a.location && a.location.includes(currentUser.room))
+    );
+  }, [assets, currentUser]);
+
+  const myHandover = useMemo(() => {
+    return handovers.find(
+      (h) => h.studentRoll === currentUser.rollNumber || h.student_roll === currentUser.rollNumber
+    );
+  }, [handovers, currentUser]);
+
+  const [handoverRemarks, setHandoverRemarks] = useState('');
+
+  const handleRequestHandover = async () => {
+    const payload = {
+      handoverId: `CLR-${Math.floor(1000 + Math.random() * 9000)}`,
+      studentRoll: currentUser.rollNumber,
+      studentName: currentUser.name,
+      room: currentUser.room,
+      block: currentUser.block,
+      date: new Date().toISOString().split('T')[0],
+      items: myAssets.map((a) => ({
+        tag: a.tag,
+        name: a.name,
+        condition: a.condition,
+        verified: true,
+      })),
+      status: 'Pending Review',
+      clearedBy: 'Pending Warden',
+      penaltyAmount: 0,
+      remarks: handoverRemarks || 'Student requested room checkout clearance',
+    };
+
+    dispatch(submitHandover(payload));
+    dispatch(
+      addToast({
+        id: `toast-${Date.now()}`,
+        message: 'Room handover checkout request submitted to Warden!',
+        type: 'success',
+      })
+    );
+    try {
+      await dispatch(submitHandoverAsync(payload)).unwrap();
+    } catch (_) {}
+  };
+
+  return (
+    <>
+      {/* Visual Room Hero Banner with Frosted Glassmorphism */}
+      <div className="room-photo-banner">
+        <img src={IMAGES.ROOM_INTERIOR} alt="Room Interior" />
+        <div className="room-photo-banner-overlay">
+          <div className="room-photo-badge">Verified Physical Allotment</div>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#ffffff' }}>
+            Room {currentUser.room} • {currentUser.block}
+          </h3>
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>
+            Resident: {currentUser.name} (Roll: {currentUser.rollNumber}) • {myAssets.length} Registered Units
+          </p>
+        </div>
+      </div>
+
+      <div className="mobile-header" style={{ marginBottom: 12 }}>
+        <div>
+          <h4>🪑 My Assigned Room Assets</h4>
+          <p style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
+            Tap 'Report Damage' to pre-populate maintenance dispatch
+          </p>
+        </div>
+        <span className="badge badge-resolved">Active Allotment</span>
+      </div>
+
+      {/* Asset Cards with Product Photos */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+        {myAssets.length === 0 ? (
+          <EmptyState icon="📭" title="No assets mapped to your room" subtitle="Contact the warden to register your room furniture." />
+        ) : (
+          myAssets.map((a) => (
+            <div key={a.tag} className="asset-photo-card">
+              <div className="asset-thumb-box">
+                <img src={getAssetImage(a.name, a.category)} alt={a.name} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <h5 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {a.name}
+                    </h5>
+                    <code style={{ fontSize: 10, color: 'var(--accent-cyan)' }}>{a.tag}</code>
+                  </div>
+                  <span className={statusBadge(a.condition)} style={{ fontSize: 10, flexShrink: 0 }}>
+                    {a.condition}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    Category: <strong style={{ color: 'var(--text-secondary)' }}>{a.category}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ color: '#f59e0b', fontSize: 11, padding: '3px 8px' }}
+                    onClick={() => onReportAsset(a)}
+                  >
+                    🚨 Report Damage
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Digital Handover Checkout Section */}
+      <div
+        style={{
+          background: 'var(--bg-glass)',
+          border: '1.5px solid var(--border-subtle)',
+          borderRadius: 'var(--radius-lg)',
+          padding: 16,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <span style={{ fontSize: 22 }}>📋</span>
+          <div>
+            <h4 style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>Hostel Handover & Checkout Clearance</h4>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+              Mandatory inventory clearance before vacation or room reallocation
+            </div>
+          </div>
+        </div>
+
+        {myHandover ? (
+          <div
+            style={{
+              marginTop: 12,
+              padding: 12,
+              background: 'rgba(16,185,129,0.08)',
+              border: '1px solid rgba(16,185,129,0.3)',
+              borderRadius: 8,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <strong style={{ fontSize: 12, color: 'var(--accent-cyan)' }}>Certificate #{myHandover.handoverId}</strong>
+              <span className={myHandover.status === 'Cleared' ? 'badge badge-resolved' : 'badge badge-pending'}>
+                {myHandover.status}
+              </span>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+              Cleared By: <strong>{myHandover.clearedBy || 'Warden Review Pending'}</strong>
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+              Penalty: ₹{myHandover.penaltyAmount || 0} • Date: {myHandover.date}
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginTop: 12 }}>
+            <p style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10 }}>
+              Verify that all {myAssets.length} allocated items in room {currentUser.room} are intact before vacating.
+            </p>
+            <input
+              className="form-input"
+              style={{ fontSize: 11, marginBottom: 10 }}
+              placeholder="Optional remarks (e.g. Completed 4th sem exams, leaving on 25th)"
+              value={handoverRemarks}
+              onChange={(e) => setHandoverRemarks(e.target.value)}
+            />
+            <button
+              type="button"
+              className="btn btn-primary btn-full btn-sm"
+              onClick={handleRequestHandover}
+              disabled={myAssets.length === 0}
+            >
+              Request Handover Verification
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 /* ══════════════ PAGE: NEW TICKET ══════════════ */
 function StudentNewTicket({ currentUser, onSubmit, onCancel, t }) {
   const dispatch = useDispatch();
-  const [step,     setStep]     = useState(1);
+  const { assets = [] } = useSelector((s) => s.ticketStore);
+
+  const roomAssets = useMemo(() => {
+    return assets.filter(
+      (a) =>
+        (a.assignedStudent && a.assignedStudent.roll === currentUser.rollNumber) ||
+        (a.assignedStudent && a.assignedStudent.name === currentUser.name) ||
+        (a.location && a.location.includes(currentUser.room))
+    );
+  }, [assets, currentUser]);
+
+  const [step, setStep] = useState(1);
+  const [selectedAssetTag, setSelectedAssetTag] = useState('');
   const [category, setCategory] = useState('Electrical');
-  const [title,    setTitle]    = useState('');
-  const [desc,     setDesc]     = useState('');
+  const [title, setTitle] = useState('');
+  const [desc, setDesc] = useState('');
   const [priority, setPriority] = useState('Medium');
 
   const handleSubmit = useCallback((e) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onSubmit({ category, title, desc, priority });
+    onSubmit({
+      category,
+      title,
+      desc,
+      priority,
+      assetTag: selectedAssetTag || `HST-${currentUser.room}-${category.toUpperCase().slice(0, 3)}`,
+    });
     dispatch(addToast({ id:`toast-${Date.now()}`, message:`Complaint "${title}" submitted successfully!`, type:'success' }));
     setTitle(''); setDesc(''); setStep(1);
-  }, [category, title, desc, priority, onSubmit, dispatch]);
+  }, [category, title, desc, priority, selectedAssetTag, currentUser.room, onSubmit, dispatch]);
 
   return (
     <>
@@ -228,6 +440,32 @@ function StudentNewTicket({ currentUser, onSubmit, onCancel, t }) {
       <form onSubmit={handleSubmit}>
         {step === 1 && (
           <>
+            {roomAssets.length > 0 && (
+              <div className="form-group" style={{ marginBottom: 14 }}>
+                <label className="form-label">Choose from My Room Assets (Auto-fill)</label>
+                <select
+                  className="form-select"
+                  value={selectedAssetTag}
+                  onChange={(e) => {
+                    const tag = e.target.value;
+                    setSelectedAssetTag(tag);
+                    const found = roomAssets.find((a) => a.tag === tag);
+                    if (found) {
+                      setTitle(`${found.name} issue / breakdown`);
+                      setCategory(found.category || 'Electrical');
+                    }
+                  }}
+                >
+                  <option value="">-- Or enter custom issue title below --</option>
+                  {roomAssets.map((a) => (
+                    <option key={a.tag} value={a.tag}>
+                      {a.name} ({a.tag}) — {a.condition}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="form-group">
               <label className="form-label">{t('issue_category', 'Issue Category')}</label>
               <div className="cat-grid">
@@ -644,9 +882,9 @@ export default function StudentView({ page, isMobile }) {
     const common = { tickets, currentUser, t };
     switch (activePage) {
       case 'home':       return <StudentHome {...common} onNewTicket={() => handleSwitchPage('new-ticket')} onViewTickets={() => handleSwitchPage('tickets')} onViewTicket={handleViewTicket} />;
+      case 'assets':     return <StudentRoomAssets currentUser={currentUser} onReportAsset={(a) => handleSwitchPage('new-ticket')} t={t} />;
       case 'tickets':    return <StudentTickets {...common} onNewTicket={() => handleSwitchPage('new-ticket')} onViewTicket={handleViewTicket} onResolve={handleResolve} />;
       case 'notices':    return <StudentNotices />;
-      case 'mess':       return <StudentMessMenu />;
       case 'new-ticket': return <StudentNewTicket {...common} onSubmit={handleTicketSubmit} onCancel={() => handleSwitchPage('tickets')} />;
       case 'scan-qr':    return <StudentScanQR t={t} />;
       case 'profile':    return <StudentProfile {...common} />;
@@ -687,9 +925,9 @@ export default function StudentView({ page, isMobile }) {
           <nav className="side-nav">
             {[
               { id: 'home', icon: '🏠', label: t('role_student', 'Overview'), desc: 'Dashboard & live stats' },
+              { id: 'assets', icon: '🪑', label: 'My Room Assets', desc: 'Assigned items & clearance' },
               { id: 'tickets', icon: '📄', label: t('my_tickets', 'My Tickets'), desc: 'Complaints & resolution', badge: myTickets.filter(t => t.status !== 'Resolved').length ? `${myTickets.filter(t => t.status !== 'Resolved').length} Active` : null },
               { id: 'notices', icon: '📢', label: 'Notices & Bulletins', desc: 'Hostel circulars & events' },
-              { id: 'mess', icon: '🍽️', label: 'Daily Mess Menu', desc: "Today's meal timings" },
               { id: 'new-ticket', icon: '➕', label: t('raise_complaint', 'New Complaint'), desc: 'Submit quick repair ticket' },
               { id: 'scan-qr', icon: '📷', label: t('scan_qr_asset', 'QR Scanner'), desc: 'Scan room asset barcodes' },
               { id: 'profile', icon: '👤', label: t('profile', 'My Profile'), desc: `${currentUser.room} • ${currentUser.block}` }

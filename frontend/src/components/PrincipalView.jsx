@@ -10,7 +10,7 @@ import EmptyState from './EmptyState';
 import MiniTrendChart from './MiniTrendChart';
 
 /* ── Page: Dashboard ── */
-function PrincipalDashboard({ tickets, staffRequests, budget, ticketVolume7d, ticketVolume30d, budgetBurn7d, t }) {
+function PrincipalDashboard({ tickets, staffRequests, budget, ticketVolume7d, ticketVolume30d, budgetBurn7d, assets = [], t }) {
   const [timeRange, setTimeRange] = useState('7d');
   const totalBudget  = budget.total;
   const spent        = budget.spent;
@@ -19,11 +19,15 @@ function PrincipalDashboard({ tickets, staffRequests, budget, ticketVolume7d, ti
   const utilizationPct = Math.round((spent / totalBudget) * 100);
   const radius = 50, circ = 2 * Math.PI * radius;
 
+  const totalAssetValuation = useMemo(() => {
+    return assets.reduce((acc, a) => acc + (a.purchaseCost || a.value || 0), 0);
+  }, [assets]);
+
   const overallStats = [
-    { label: t('role_assets', 'Total Assets'),           value:'147',   icon:'🏁', color:'var(--accent-cyan)'   },
-    { label: t('my_tickets', 'Total Tickets'),           value:tickets.length, icon:'📄', color:'var(--accent-primary)' },
+    { label: t('role_assets', 'Physical Assets'),        value: assets.length || '147', icon:'📦', color:'var(--accent-cyan)'   },
+    { label: 'Portfolio Valuation',                      value:`₹${(totalAssetValuation || 245000).toLocaleString()}`, icon:'💰', color:'#10b981' },
+    { label: t('my_tickets', 'Maintenance Tickets'),     value:tickets.length, icon:'📄', color:'var(--accent-primary)' },
     { label: t('pending_release', 'Pending Approvals'),  value:pendingReqs.length, icon:'⏳', color:'var(--accent-yellow)' },
-    { label: t('resolved', 'Resolved Issues'),           value:tickets.filter(tk=>tk.status==='Resolved').length, icon:'✅', color:'var(--accent-green)' },
   ];
 
   return (
@@ -233,7 +237,7 @@ function PrincipalApprovals({ staffRequests, onApprove, onReject, t }) {
 /* ══════════════ MAIN EXPORT ══════════════ */
 export default function PrincipalView({ page, isMobile }) {
   const dispatch = useDispatch();
-  const { tickets, staffRequests, budget, ticketVolume7d, ticketVolume30d, budgetBurn7d } = useSelector((s) => s.ticketStore);
+  const { tickets, staffRequests, budget, assets = [], ticketVolume7d, ticketVolume30d, budgetBurn7d } = useSelector((s) => s.ticketStore);
   const { t } = useTranslation();
 
   const switchPage = useCallback((id) => dispatch(setPage(id)), [dispatch]);
@@ -267,9 +271,9 @@ export default function PrincipalView({ page, isMobile }) {
 
   const renderContent = () => {
     switch (page) {
-      case 'dashboard':       return <PrincipalDashboard tickets={tickets} staffRequests={staffRequests} budget={budget} ticketVolume7d={ticketVolume7d} ticketVolume30d={ticketVolume30d} budgetBurn7d={budgetBurn7d} t={t} />;
+      case 'dashboard':       return <PrincipalDashboard tickets={tickets} staffRequests={staffRequests} budget={budget} assets={assets} ticketVolume7d={ticketVolume7d} ticketVolume30d={ticketVolume30d} budgetBurn7d={budgetBurn7d} t={t} />;
       case 'final-approvals': return <PrincipalApprovals staffRequests={staffRequests} onApprove={handleApprove} onReject={handleReject} t={t} />;
-      default:                return <PrincipalDashboard tickets={tickets} staffRequests={staffRequests} budget={budget} ticketVolume7d={ticketVolume7d} ticketVolume30d={ticketVolume30d} budgetBurn7d={budgetBurn7d} t={t} />;
+      default:                return <PrincipalDashboard tickets={tickets} staffRequests={staffRequests} budget={budget} assets={assets} ticketVolume7d={ticketVolume7d} ticketVolume30d={ticketVolume30d} budgetBurn7d={budgetBurn7d} t={t} />;
     }
   };
 

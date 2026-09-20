@@ -22,6 +22,9 @@ export const fetchInitialData = createAsyncThunk(
         ratingsRes,
         profileRes,
         analyticsRes,
+        transfersRes,
+        auditsRes,
+        handoversRes,
       ] = await Promise.all([
         api.tickets.getAll().catch(() => null),
         api.requests.getAll().catch(() => null),
@@ -34,6 +37,9 @@ export const fetchInitialData = createAsyncThunk(
         api.tickets.getAllRatings().catch(() => null),
         api.auth.getProfile().catch(() => null),
         api.analytics.getOverview().catch(() => null),
+        api.assets.getTransfers().catch(() => null),
+        api.assets.getAudits().catch(() => null),
+        api.assets.getHandovers().catch(() => null),
       ]);
 
       return {
@@ -48,6 +54,9 @@ export const fetchInitialData = createAsyncThunk(
         ticketRatings: ratingsRes,
         currentUser: profileRes,
         analytics: analyticsRes,
+        transfers: transfersRes,
+        audits: auditsRes,
+        handovers: handoversRes,
       };
     } catch (err) {
       return rejectWithValue(err.message);
@@ -190,12 +199,84 @@ export const bulkApproveStaffRequestsAsync = createAsyncThunk(
 );
 
 // 4. Asset Async Operations
+export const createAssetAsync = createAsyncThunk(
+  'hostel/createAssetAsync',
+  async (assetData, { rejectWithValue }) => {
+    try {
+      const created = await api.assets.create(assetData);
+      return created;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const transferAssetAsync = createAsyncThunk(
+  'hostel/transferAssetAsync',
+  async (transferData, { rejectWithValue }) => {
+    try {
+      const res = await api.assets.transfer(transferData);
+      return res;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const recordAuditAsync = createAsyncThunk(
+  'hostel/recordAuditAsync',
+  async (auditData, { rejectWithValue }) => {
+    try {
+      const res = await api.assets.submitAudit(auditData);
+      return res;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const submitHandoverAsync = createAsyncThunk(
+  'hostel/submitHandoverAsync',
+  async (handoverData, { rejectWithValue }) => {
+    try {
+      const res = await api.assets.submitHandover(handoverData);
+      return res;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const clearHandoverAsync = createAsyncThunk(
+  'hostel/clearHandoverAsync',
+  async ({ id, data }, { rejectWithValue }) => {
+    try {
+      const res = await api.assets.clearHandover(id, data);
+      return res;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const retireAssetAsync = createAsyncThunk(
+  'hostel/retireAssetAsync',
+  async (tag, { rejectWithValue }) => {
+    try {
+      const res = await api.assets.retire(tag);
+      return { tag, res };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
 export const updateAssetConditionAsync = createAsyncThunk(
   'hostel/updateAssetConditionAsync',
-  async ({ tag, condition, actor }, { rejectWithValue }) => {
+  async ({ tag, condition, actor, cost, action }, { rejectWithValue }) => {
     try {
-      const updated = await api.assets.updateCondition(tag, condition, actor);
-      return { tag, condition, updated };
+      const updated = await api.assets.updateCondition(tag, condition, actor, cost, action);
+      return { tag, condition, updated, cost, action };
     } catch (err) {
       return rejectWithValue(err.message);
     }
@@ -378,16 +459,238 @@ const initialState = {
     { id: 'W5', name: 'Rajan M.',      skill: 'Plumber',     phone: '+91 98765 66677', availability: 'Busy',      jobs: 3, rating: 4.9, completedJobs: 183 },
   ],
 
-  /* ── Assets ── */
+  /* ── Physical Asset Inventory ── */
   assets: [
-    { tag: 'QR-A302-BED-01', name: 'Single Bed',       category: 'Furniture',   location: 'Room 302, Block A', condition: 'Good',              lastChecked: '10 Aug 2025', value: 8000,  maintenanceHistory: [{ date:'10 Aug 2025', action:'Annual inspection — Good', actor:'Dr. Meena Sharma', color:'var(--accent-green)' }, { date:'15 Jan 2025', action:'Minor repair on frame', actor:'Selvam R.', color:'var(--accent-cyan)' }] },
-    { tag: 'QR-A302-DSK-01', name: 'Study Desk',        category: 'Furniture',   location: 'Room 302, Block A', condition: 'Needs Repair',      lastChecked: '05 Aug 2025', value: 4500,  maintenanceHistory: [{ date:'05 Aug 2025', action:'Surface crack noted — needs repair', actor:'Dr. Meena Sharma', color:'var(--accent-yellow)' }] },
-    { tag: 'QR-A302-AC-01',  name: 'Split AC 1.5T',     category: 'Appliance',   location: 'Room 302, Block A', condition: 'Good',              lastChecked: '12 Aug 2025', value: 35000, maintenanceHistory: [{ date:'12 Aug 2025', action:'Annual servicing done', actor:'Sarathi Kamal', color:'var(--accent-green)' }, { date:'01 Mar 2025', action:'Gas refill & cleaning', actor:'Mohan Kumar', color:'var(--accent-cyan)' }] },
-    { tag: 'QR-B112-FAN-02', name: 'Ceiling Fan',        category: 'Electrical',  location: 'Room 112, Block B', condition: 'Damaged',           lastChecked: '01 Aug 2025', value: 2500,  maintenanceHistory: [{ date:'01 Aug 2025', action:'Blade bent — marked damaged', actor:'Dr. Meena Sharma', color:'var(--accent-red)' }] },
-    { tag: 'QR-C208-LGT-01', name: 'LED Tube 20W',       category: 'Electrical',  location: 'Room 208, Block C', condition: 'Under Maintenance', lastChecked: '08 Aug 2025', value: 800,   maintenanceHistory: [{ date:'08 Aug 2025', action:'Flickering — under maintenance', actor:'Sarathi Kamal', color:'var(--accent-primary)' }] },
-    { tag: 'QR-A304-RTR-01', name: 'Wi-Fi AP Router',    category: 'Networking',  location: 'Room 304, Block A', condition: 'Good',              lastChecked: '14 Aug 2025', value: 6000,  maintenanceHistory: [{ date:'14 Aug 2025', action:'Firmware updated', actor:'Dhariq Anwar', color:'var(--accent-green)' }] },
-    { tag: 'QR-D101-GYS-01', name: 'Electric Geyser 25L',category: 'Appliance',   location: 'Room 101, Block D', condition: 'Good',              lastChecked: '11 Aug 2025', value: 7500,  maintenanceHistory: [{ date:'11 Aug 2025', action:'Safety check passed', actor:'Mohan Kumar', color:'var(--accent-green)' }] },
-    { tag: 'QR-B205-CHR-03', name: 'Study Chair',        category: 'Furniture',   location: 'Room 205, Block B', condition: 'Good',              lastChecked: '09 Aug 2025', value: 2200,  maintenanceHistory: [{ date:'09 Aug 2025', action:'Annual inspection — Good', actor:'Dr. Meena Sharma', color:'var(--accent-green)' }] },
+    {
+      tag: 'HST-A204-BED-01',
+      name: 'Single Wooden Cot Bed',
+      category: 'Furniture',
+      block: 'Block A',
+      floor: 'Floor 2',
+      room: '204',
+      location: 'Block A - Room 204',
+      condition: 'Good',
+      status: 'Assigned',
+      purchaseDate: '2024-06-12',
+      purchaseCost: 8500,
+      currentValue: 7225,
+      depreciationRate: 10,
+      warrantyExpiry: '2027-06-12',
+      supplier: 'Apex Institutional Furnishings Ltd.',
+      assignedStudent: { roll: '21CS204', name: 'Himachalam' },
+      lastChecked: 'Today',
+      qrCodeData: 'HOSTELOPS:HST-A204-BED-01',
+      maintenanceHistory: [
+        { date: '10 Aug 2025', action: 'Annual inspection — In solid condition', actor: 'Dr. Meena Sharma', cost: 0, color: 'var(--accent-green)' },
+      ],
+    },
+    {
+      tag: 'HST-A204-TBL-01',
+      name: 'Ergonomic Study Table',
+      category: 'Furniture',
+      block: 'Block A',
+      floor: 'Floor 2',
+      room: '204',
+      location: 'Block A - Room 204',
+      condition: 'Good',
+      status: 'Assigned',
+      purchaseDate: '2024-06-12',
+      purchaseCost: 4500,
+      currentValue: 3825,
+      depreciationRate: 10,
+      warrantyExpiry: '2027-06-12',
+      supplier: 'Apex Institutional Furnishings Ltd.',
+      assignedStudent: { roll: '21CS204', name: 'Himachalam' },
+      lastChecked: 'Today',
+      qrCodeData: 'HOSTELOPS:HST-A204-TBL-01',
+      maintenanceHistory: [
+        { date: '15 Jan 2025', action: 'Edge lamination touch-up', actor: 'Selvam R.', cost: 150, color: 'var(--accent-cyan)' },
+      ],
+    },
+    {
+      tag: 'HST-A204-CHR-01',
+      name: 'Cushioned Study Chair',
+      category: 'Furniture',
+      block: 'Block A',
+      floor: 'Floor 2',
+      room: '204',
+      location: 'Block A - Room 204',
+      condition: 'Good',
+      status: 'Assigned',
+      purchaseDate: '2024-06-12',
+      purchaseCost: 2800,
+      currentValue: 2380,
+      depreciationRate: 10,
+      warrantyExpiry: '2026-06-12',
+      supplier: 'Apex Institutional Furnishings Ltd.',
+      assignedStudent: { roll: '21CS204', name: 'Himachalam' },
+      lastChecked: 'Today',
+      qrCodeData: 'HOSTELOPS:HST-A204-CHR-01',
+      maintenanceHistory: [],
+    },
+    {
+      tag: 'HST-A204-FAN-01',
+      name: 'Ceiling Fan 1200mm',
+      category: 'Electrical',
+      block: 'Block A',
+      floor: 'Floor 2',
+      room: '204',
+      location: 'Block A - Room 204',
+      condition: 'Needs Repair',
+      status: 'Assigned',
+      purchaseDate: '2024-06-12',
+      purchaseCost: 2400,
+      currentValue: 2040,
+      depreciationRate: 10,
+      warrantyExpiry: '2026-12-12',
+      supplier: 'Havells Institutional Direct',
+      assignedStudent: { roll: '21CS204', name: 'Himachalam' },
+      lastChecked: 'Today',
+      qrCodeData: 'HOSTELOPS:HST-A204-FAN-01',
+      maintenanceHistory: [
+        { date: '18 Sep 2026', action: 'Regulator noise reported by resident', actor: 'Himachalam', cost: 0, color: 'var(--accent-yellow)' },
+      ],
+    },
+    {
+      tag: 'HST-A204-ALM-01',
+      name: 'Steel Storage Almirah',
+      category: 'Furniture',
+      block: 'Block A',
+      floor: 'Floor 2',
+      room: '204',
+      location: 'Block A - Room 204',
+      condition: 'Good',
+      status: 'Assigned',
+      purchaseDate: '2024-06-12',
+      purchaseCost: 11000,
+      currentValue: 9350,
+      depreciationRate: 10,
+      warrantyExpiry: '2029-06-12',
+      supplier: 'Godrej Security & Steel',
+      assignedStudent: { roll: '21CS204', name: 'Himachalam' },
+      lastChecked: 'Today',
+      qrCodeData: 'HOSTELOPS:HST-A204-ALM-01',
+      maintenanceHistory: [],
+    },
+    {
+      tag: 'HST-B112-FAN-02',
+      name: 'Ceiling Fan 1200mm',
+      category: 'Electrical',
+      block: 'Block B',
+      floor: 'Floor 1',
+      room: '112',
+      location: 'Block B - Room 112',
+      condition: 'Damaged',
+      status: 'Assigned',
+      purchaseDate: '2024-01-10',
+      purchaseCost: 2500,
+      currentValue: 2000,
+      depreciationRate: 10,
+      warrantyExpiry: '2026-01-10',
+      supplier: 'Havells Institutional Direct',
+      assignedStudent: { roll: '21EC112', name: 'Sundar' },
+      lastChecked: '01 Aug 2025',
+      qrCodeData: 'HOSTELOPS:HST-B112-FAN-02',
+      maintenanceHistory: [{ date: '01 Aug 2025', action: 'Blade bent & motor jammed — marked damaged', actor: 'Dr. Meena Sharma', cost: 0, color: 'var(--accent-red)' }],
+    },
+    {
+      tag: 'HST-C208-LGT-01',
+      name: 'LED Tube 20W',
+      category: 'Electrical',
+      block: 'Block C',
+      floor: 'Floor 2',
+      room: '208',
+      location: 'Block C - Room 208',
+      condition: 'Under Maintenance',
+      status: 'Under Maintenance',
+      purchaseDate: '2025-02-14',
+      purchaseCost: 800,
+      currentValue: 720,
+      depreciationRate: 10,
+      warrantyExpiry: '2027-02-14',
+      supplier: 'Philips Lighting India',
+      assignedStudent: { roll: '21CS208', name: 'Janaki' },
+      lastChecked: '08 Aug 2025',
+      qrCodeData: 'HOSTELOPS:HST-C208-LGT-01',
+      maintenanceHistory: [{ date: '08 Aug 2025', action: 'Driver capacitor replacement ongoing', actor: 'Sarathi Kamal', cost: 120, color: 'var(--accent-primary)' }],
+    },
+    {
+      tag: 'HST-STR-CHR-04',
+      name: 'Spare Study Chair',
+      category: 'Furniture',
+      block: 'Central Store',
+      floor: 'Floor 1',
+      room: 'Store Room',
+      location: 'Central Store - Floor 1',
+      condition: 'Good',
+      status: 'In Store',
+      purchaseDate: '2025-05-10',
+      purchaseCost: 2200,
+      currentValue: 2200,
+      depreciationRate: 10,
+      warrantyExpiry: '2027-05-10',
+      supplier: 'Apex Institutional Furnishings Ltd.',
+      assignedStudent: { roll: '', name: '' },
+      lastChecked: 'Yesterday',
+      qrCodeData: 'HOSTELOPS:HST-STR-CHR-04',
+      maintenanceHistory: [],
+    },
+    {
+      tag: 'HST-STR-MAT-01',
+      name: 'Coir Mattress Single',
+      category: 'Furniture',
+      block: 'Central Store',
+      floor: 'Floor 1',
+      room: 'Store Room',
+      location: 'Central Store - Floor 1',
+      condition: 'Good',
+      status: 'In Store',
+      purchaseDate: '2025-06-01',
+      purchaseCost: 3500,
+      currentValue: 3500,
+      depreciationRate: 10,
+      warrantyExpiry: '2028-06-01',
+      supplier: 'Kurl-On Institutional',
+      assignedStudent: { roll: '', name: '' },
+      lastChecked: 'Yesterday',
+      qrCodeData: 'HOSTELOPS:HST-STR-MAT-01',
+      maintenanceHistory: [],
+    },
+  ],
+
+  /* ── Asset Transfers & Movement History ── */
+  transfers: [
+    { id: 'TR-101', assetTag: 'HST-A204-TBL-01', assetName: 'Study Table', from: 'Block A - Room 102', to: 'Block A - Room 204', transferredBy: 'Dr. Meena Sharma', date: '2026-08-10', reason: 'Student room allotment' },
+    { id: 'TR-102', assetTag: 'HST-STR-CHR-04', assetName: 'Study Chair', from: 'Central Store - Floor 1', to: 'Block B - Room 205', transferredBy: 'Asset Manager', date: '2026-08-15', reason: 'Replacement for broken chair' },
+  ],
+
+  /* ── Physical Asset Audits ── */
+  audits: [
+    { auditId: 'AUD-9021', block: 'Block A', room: '204', auditor: 'Dr. Meena Sharma', date: '2026-09-19', expectedCount: 5, scannedCount: 5, missingCount: 0, status: 'Verified 100%' },
+    { auditId: 'AUD-9018', block: 'Block B', room: '112', auditor: 'Dr. Meena Sharma', date: '2026-09-17', expectedCount: 5, scannedCount: 4, missingCount: 1, status: 'Discrepancy Found' },
+  ],
+
+  /* ── Student Handover Clearances ── */
+  handovers: [
+    {
+      handoverId: 'CLR-7701',
+      studentRoll: '21CS204',
+      studentName: 'Himachalam',
+      room: 'A-204',
+      block: 'Block A',
+      date: '2026-09-20',
+      items: [
+        { tag: 'HST-A204-BED-01', name: 'Single Wooden Cot Bed', condition: 'Good', verified: true },
+        { tag: 'HST-A204-TBL-01', name: 'Ergonomic Study Table', condition: 'Good', verified: true },
+        { tag: 'HST-A204-CHR-01', name: 'Cushioned Study Chair', condition: 'Good', verified: true },
+        { tag: 'HST-A204-FAN-01', name: 'Ceiling Fan 1200mm', condition: 'Needs Repair', verified: true },
+        { tag: 'HST-A204-ALM-01', name: 'Steel Storage Almirah', condition: 'Good', verified: true },
+      ],
+      status: 'Pending Review',
+      clearedBy: 'Pending Warden',
+      penaltyAmount: 0,
+      remarks: 'End of semester routine clearance',
+    },
   ],
 
   /* ── Audit Log ── */
@@ -585,6 +888,61 @@ export const ticketSlice = createSlice({
       const { tag, record } = action.payload;
       const a = state.assets.find(a => a.tag === tag);
       if (a) { if (!a.maintenanceHistory) a.maintenanceHistory = []; a.maintenanceHistory.unshift(record); }
+    },
+    addAsset: (state, action) => {
+      state.assets.unshift(action.payload);
+    },
+    updateAsset: (state, action) => {
+      const index = state.assets.findIndex(a => a.tag === action.payload.tag);
+      if (index !== -1) state.assets[index] = { ...state.assets[index], ...action.payload };
+    },
+    retireAsset: (state, action) => {
+      const a = state.assets.find(a => a.tag === action.payload);
+      if (a) {
+        a.status = 'Retired';
+        a.condition = 'Damaged';
+      }
+    },
+    transferAsset: (state, action) => {
+      const { tag, toBlock, toRoom, transferredBy, reason, date } = action.payload;
+      const a = state.assets.find(a => a.tag === tag);
+      const from = a ? a.location : 'Unknown';
+      if (a) {
+        a.block = toBlock;
+        a.room = toRoom;
+        a.location = `${toBlock} - Room ${toRoom}`;
+      }
+      state.transfers.unshift({
+        id: `TR-${Date.now()}`,
+        assetTag: tag,
+        assetName: a ? a.name : tag,
+        from,
+        to: `${toBlock} - Room ${toRoom}`,
+        transferredBy: transferredBy || 'Warden',
+        reason: reason || 'Room rearrangement',
+        date: date || new Date().toISOString().split('T')[0],
+      });
+    },
+    recordAudit: (state, action) => {
+      state.audits.unshift(action.payload);
+      if (action.payload.missingTags && action.payload.missingTags.length) {
+        state.assets.forEach(a => {
+          if (action.payload.missingTags.includes(a.tag)) {
+            a.status = 'Missing';
+          }
+        });
+      }
+    },
+    submitHandover: (state, action) => {
+      state.handovers.unshift(action.payload);
+    },
+    clearHandover: (state, action) => {
+      const h = state.handovers.find(h => h.handoverId === action.payload.handoverId);
+      if (h) {
+        h.status = action.payload.status || 'Cleared';
+        h.clearedBy = action.payload.clearedBy || 'Dr. Meena Sharma';
+        h.penaltyAmount = action.payload.penaltyAmount || 0;
+      }
     },
 
     /* ── Notification Actions ── */
@@ -872,6 +1230,47 @@ export const ticketSlice = createSlice({
     builder.addCase(addAuditEntryAsync.fulfilled, (state, action) => {
       state.auditLog.unshift(action.payload);
     });
+
+    // 18. Create Asset
+    builder.addCase(createAssetAsync.fulfilled, (state, action) => {
+      if (action.payload) state.assets.unshift(action.payload);
+    });
+
+    // 19. Transfer Asset
+    builder.addCase(transferAssetAsync.fulfilled, (state, action) => {
+      if (action.payload?.transfer) state.transfers.unshift(action.payload.transfer);
+      if (action.payload?.asset) {
+        const idx = state.assets.findIndex(a => a.tag === action.payload.asset.tag);
+        if (idx !== -1) state.assets[idx] = { ...state.assets[idx], ...action.payload.asset };
+      }
+    });
+
+    // 20. Record Audit
+    builder.addCase(recordAuditAsync.fulfilled, (state, action) => {
+      if (action.payload) state.audits.unshift(action.payload);
+    });
+
+    // 21. Submit Handover
+    builder.addCase(submitHandoverAsync.fulfilled, (state, action) => {
+      if (action.payload) state.handovers.unshift(action.payload);
+    });
+
+    // 22. Clear Handover
+    builder.addCase(clearHandoverAsync.fulfilled, (state, action) => {
+      if (action.payload) {
+        const idx = state.handovers.findIndex(h => h.handover_id === action.payload.handover_id || h.handoverId === action.payload.handover_id);
+        if (idx !== -1) state.handovers[idx] = { ...state.handovers[idx], ...action.payload };
+      }
+    });
+
+    // 23. Retire Asset
+    builder.addCase(retireAssetAsync.fulfilled, (state, action) => {
+      const a = state.assets.find(ast => ast.tag === action.payload.tag);
+      if (a) {
+        a.status = 'Retired';
+        a.condition = 'Damaged';
+      }
+    });
   },
 });
 
@@ -886,6 +1285,7 @@ export const {
   addTicket, addStudentTicket, resolveTicket, assignWorkerToTicket, updateTicketPriority,
   approveStaffReq, rejectStaffReq,
   markJobComplete, updateAssetCondition, addAssetMaintenanceRecord,
+  addAsset, updateAsset, retireAsset, transferAsset, recordAudit, submitHandover, clearHandover,
   markNotificationRead, markAllNotificationsRead, addNotification,
   addAuditEntry,
 } = ticketSlice.actions;

@@ -15,7 +15,6 @@ import { useTranslation } from './utils/translations';
 /* ── Role Views ── */
 import LoginPage      from './components/LoginPage';
 import StudentView    from './components/StudentView';
-import StaffView      from './components/StaffView';
 import WardenView     from './components/WardenView';
 import ResWardenView  from './components/ResWardenView';
 import TechnicianView from './components/TechnicianView';
@@ -38,7 +37,6 @@ import './index.css';
 const ROLE_CONFIG = [
   { id: 'login',       key: 'role_login',        defaultLabel: 'Login',        icon: '🔐', color: '#7c3aed' },
   { id: 'student',     key: 'role_student',      defaultLabel: 'Student',      icon: '🎓', color: '#06b6d4' },
-  { id: 'staff',       key: 'role_staff',        defaultLabel: 'Staff',        icon: '👨‍🍳', color: '#f97316' },
   { id: 'asst-warden', key: 'role_asst_warden',  defaultLabel: 'Asst. Warden', icon: '🏫', color: '#8b5cf6' },
   { id: 'res-warden',  key: 'role_res_warden',   defaultLabel: 'Res. Warden',  icon: '🏛️', color: '#ec4899' },
   { id: 'technician',  key: 'role_technician',   defaultLabel: 'Technician',   icon: '⚡', color: '#f59e0b' },
@@ -160,7 +158,6 @@ export default function App() {
     switch (currentRole) {
       case 'login':       return <LoginPage />;
       case 'student':     return <StudentView     page={currentPage} isMobile={isMobile} />;
-      case 'staff':       return <StaffView       page={currentPage} isMobile={isMobile} />;
       case 'asst-warden': return <WardenView      page={currentPage} isMobile={isMobile} />;
       case 'res-warden':  return <ResWardenView   page={currentPage} isMobile={isMobile} />;
       case 'technician':  return <TechnicianView  page={currentPage} isMobile={isMobile} />;

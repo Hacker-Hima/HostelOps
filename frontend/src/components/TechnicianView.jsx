@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import {
   setPage, markJobComplete, addToast, addComment, openTicketDrawer, addAuditEntry,
   resolveTicketAsync, toggleWorkerAvailabilityAsync, addCommentAsync, setProfileModalOpen,
+  updateAssetCondition, addAssetMaintenanceRecord, updateAssetConditionAsync,
 } from '../redux/ticketSlice';
 import { useTranslation } from '../utils/translations';
 import PhoneFrame from './PhoneFrame';
@@ -202,6 +203,7 @@ function TechnicianJobDetail({ tickets, selectedJobId, onBack, onComplete, compl
         <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
           <span style={{fontSize:10,background:'rgba(255,255,255,0.06)',borderRadius:'var(--radius-sm)',padding:'3px 8px',color:'var(--text-secondary)'}}>📍 {job.room}</span>
           <span style={{fontSize:10,background:'rgba(255,255,255,0.06)',borderRadius:'var(--radius-sm)',padding:'3px 8px',color:'var(--text-secondary)'}}>🏷️ {job.category}</span>
+          <span style={{fontSize:10,background:'rgba(6,182,212,0.12)',border:'1px solid rgba(6,182,212,0.3)',borderRadius:'var(--radius-sm)',padding:'3px 8px',color:'var(--accent-cyan)',fontWeight:700}}>📱 Asset: {job.assetTag || 'HST-A204-FAN-01'}</span>
           <span style={{fontSize:10,background:'rgba(255,255,255,0.06)',borderRadius:'var(--radius-sm)',padding:'3px 8px',color:'var(--text-secondary)'}}>⏰ {job.createdAt}</span>
         </div>
       </div>
@@ -230,6 +232,18 @@ function TechnicianJobDetail({ tickets, selectedJobId, onBack, onComplete, compl
             <JobStopwatchTimer onInsertDuration={(dur) => setNotes(prev => prev ? `${prev}\n${dur}` : dur)} />
           </div>
 
+          <div style={{ marginBottom: 12 }}>
+            <label className="form-label" style={{ fontSize: 11 }}>Incurred Repair Cost / Parts (₹)</label>
+            <input
+              type="number"
+              className="form-input"
+              style={{ fontSize: 12 }}
+              placeholder="e.g. 350 (Spare capacitor & winding test)"
+              defaultValue={250}
+              id="repair-cost-input"
+            />
+          </div>
+
           <textarea
             className="form-textarea"
             rows={3}
@@ -238,7 +252,13 @@ function TechnicianJobDetail({ tickets, selectedJobId, onBack, onComplete, compl
             onChange={(e)=>setNotes(e.target.value)}
             style={{marginBottom:10}}
           />
-          <button className="btn btn-success btn-full btn-lg" onClick={()=>onComplete(job.id, notes)}>
+          <button
+            className="btn btn-success btn-full btn-lg"
+            onClick={() => {
+              const cost = document.getElementById('repair-cost-input')?.value || 0;
+              onComplete(job.id, notes, cost);
+            }}
+          >
             {t('mark_job_completed', '✓ Submit Proof & Mark Complete')}
           </button>
         </>
@@ -273,14 +293,16 @@ export default function TechnicianView({ page, isMobile }) {
     dispatch(openTicketDrawer(id));
   }, [dispatch]);
 
-  const handleComplete = useCallback(async (id, noteText) => {
+  const handleComplete = useCallback(async (id, noteText, repairCost = 0) => {
+    const job = tickets.find(tk => tk.id === id);
+    const assetTag = job?.assetTag;
+
     try {
       await dispatch(resolveTicketAsync({
         ticketId: id,
         notes: noteText || 'Work completed by technician.',
         actor: 'Sarathi Kamal (Worker)',
       })).unwrap();
-      dispatch(addToast({ id: `toast-${Date.now()}`, message: `Job ${id} completed & saved to database!`, type: 'success' }));
     } catch {
       dispatch(markJobComplete(id));
       if (noteText) {
@@ -290,16 +312,41 @@ export default function TechnicianView({ page, isMobile }) {
             id: `C${Date.now()}`,
             author: 'Sarathi Kamal',
             role: 'Technician',
-            text: `Work completed by technician. Notes: ${noteText}`,
+            text: `Work completed by technician. Cost: ₹${repairCost}. Notes: ${noteText}`,
             time: 'Just now',
           },
         }));
       }
-      dispatch(addToast({ id: `toast-${Date.now()}`, message: `Job ${id} completed & closed!`, type: 'success' }));
     }
+
+    // Restore Asset Condition back to Good & log repair cost
+    if (assetTag) {
+      dispatch(updateAssetCondition({ tag: assetTag, condition: 'Good' }));
+      dispatch(addAssetMaintenanceRecord({
+        tag: assetTag,
+        record: {
+          date: new Date().toISOString().split('T')[0],
+          action: `Repaired & verified: ${noteText || 'Fault rectified'} (Cost: ₹${repairCost})`,
+          actor: 'Sarathi Kamal (Technician)',
+          cost: Number(repairCost) || 0,
+          color: 'var(--accent-green)',
+        },
+      }));
+      try {
+        await dispatch(updateAssetConditionAsync({
+          tag: assetTag,
+          condition: 'Good',
+          actor: 'Sarathi Kamal (Technician)',
+          cost: Number(repairCost) || 0,
+          action: `Repaired: ${noteText || 'Fault rectified'}`,
+        })).unwrap();
+      } catch (_) {}
+    }
+
+    dispatch(addToast({ id: `toast-${Date.now()}`, message: `Job ${id} completed! Asset marked Good.`, type: 'success' }));
     setCompletedIds(p=>[...p, id]);
     switchPage('feed');
-  }, [dispatch, switchPage]);
+  }, [dispatch, tickets, switchPage]);
 
   const renderContent = () => {
     switch (activePage) {

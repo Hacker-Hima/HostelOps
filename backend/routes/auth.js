@@ -16,18 +16,6 @@ const DEMO_USERS = {
     phone: '+91 98765 43210',
     role: 'student',
   },
-  staff: {
-    id: 'usr-2',
-    name: 'Sanji',
-    initials: 'SJ',
-    room: 'Mess Staff Qtrs',
-    block: 'Block A',
-    floor: 'Ground Floor',
-    rollNumber: 'STAFF-409',
-    email: 'sanji@hostel.edu',
-    phone: '+91 98765 12345',
-    role: 'staff',
-  },
   'asst-warden': {
     id: 'usr-3',
     name: 'Dr. Meena Sharma',
