@@ -40,11 +40,31 @@ app.use((req, res, next) => {
   next();
 });
 
+// Root & API Base route
+app.get(['/', '/api'], (req, res) => {
+  res.json({
+    name: 'HostelOps Backend API',
+    status: 'running',
+    database: isConnected ? 'Connected (MongoDB Atlas)' : 'Disconnected',
+    endpoints: {
+      health: '/api/health',
+      tickets: '/api/tickets',
+      workers: '/api/workers',
+      assets: '/api/assets',
+      requests: '/api/requests',
+      budget: '/api/budget',
+      analytics: '/api/analytics',
+      notifications: '/api/notifications',
+      auditLogs: '/api/audit-logs',
+    },
+  });
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    database: isConnected ? 'Connected (MongoDB)' : 'Standby (No MongoDB connection)',
+    database: isConnected ? 'Connected (MongoDB Atlas)' : 'Standby (No MongoDB connection)',
     isConnected,
     service: 'HostelOps Backend API',
     uptime: process.uptime(),
