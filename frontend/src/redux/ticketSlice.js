@@ -1,206 +1,120 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from '../services/api';
+import { getStoredSession, saveSession, clearSession } from '../utils/authStorage';
 
 /* ══════════════════════════════════════════════════════════
    ASYNC THUNKS — BACKEND DATABASE COMMUNICATION
 ══════════════════════════════════════════════════════════ */
 
-// 1. Initial Full Data Hydration from Backend
+// 1. Initial Hydration from Backend
 export const fetchInitialData = createAsyncThunk(
-  'hostel/fetchInitialData',
+  'assetOps/fetchInitialData',
   async (_, { rejectWithValue }) => {
     try {
+      // First verify backend & database health
+      let health = null;
+      try {
+        if (api.system && typeof api.system.health === 'function') {
+          health = await api.system.health();
+        } else if (typeof api.health === 'function') {
+          health = await api.health();
+        } else {
+          const res = await fetch('/api/health');
+          health = await res.json();
+        }
+      } catch {
+        return rejectWithValue({
+          type: 'BACKEND_UNAVAILABLE',
+          message: 'Backend server is unreachable. Please verify server is running on port 5000.',
+        });
+      }
+
+      if (health && health.database && !health.database.connected) {
+        return rejectWithValue({
+          type: 'DATABASE_UNAVAILABLE',
+          message: 'Backend is running, but database connection is unavailable.',
+          health,
+        });
+      }
+
+      // Backend & DB reachable — fetch all resources with Promise.allSettled
+      const endpoints = [
+        api.assets.getAll(),
+        api.assets.getCategories(),
+        api.assets.getMaintenance(),
+        api.assets.getTransfers(),
+        api.assets.getAudits(),
+        api.assets.getDisposals(),
+        api.assets.getRequests(),
+        api.assets.getReportsSummary(),
+        api.workers.getAll(),
+        api.audit.getAll(),
+        api.notifications.getAll(),
+        api.auth.getUsers(),
+      ];
+
+      const results = await Promise.allSettled(endpoints);
+
       const [
-        ticketsRes,
-        requestsRes,
-        workersRes,
         assetsRes,
-        budgetRes,
-        auditRes,
-        notifsRes,
-        commentsRes,
-        ratingsRes,
-        profileRes,
-        analyticsRes,
+        categoriesRes,
+        maintenanceRes,
         transfersRes,
         auditsRes,
-        handoversRes,
-      ] = await Promise.all([
-        api.tickets.getAll().catch(() => null),
-        api.requests.getAll().catch(() => null),
-        api.workers.getAll().catch(() => null),
-        api.assets.getAll().catch(() => null),
-        api.budget.get().catch(() => null),
-        api.audit.getAll().catch(() => null),
-        api.notifications.getAll().catch(() => null),
-        api.tickets.getAllComments().catch(() => null),
-        api.tickets.getAllRatings().catch(() => null),
-        api.auth.getProfile().catch(() => null),
-        api.analytics.getOverview().catch(() => null),
-        api.assets.getTransfers().catch(() => null),
-        api.assets.getAudits().catch(() => null),
-        api.assets.getHandovers().catch(() => null),
-      ]);
+        disposalsRes,
+        requestsRes,
+        reportsRes,
+        workersRes,
+        auditLogsRes,
+        notifsRes,
+        usersRes,
+      ] = results;
+
+      const failedEndpoints = [];
+      const extract = (res, name, fallback) => {
+        if (res.status === 'fulfilled') return res.value;
+        failedEndpoints.push(name);
+        return fallback;
+      };
+
+      // Standardize notifications to ensure isRead camelCase property
+      const rawNotifs = extract(notifsRes, 'notifications', []);
+      const normalizedNotifs = Array.isArray(rawNotifs)
+        ? rawNotifs.map((n) => ({
+            ...n,
+            isRead: n.isRead !== undefined ? !!n.isRead : (n.is_read === 1 || n.is_read === true),
+            is_read: n.isRead ? 1 : (n.is_read ?? 0),
+          }))
+        : [];
 
       return {
-        tickets: ticketsRes,
-        staffRequests: requestsRes,
-        workers: workersRes,
-        assets: assetsRes,
-        budget: budgetRes,
-        auditLog: auditRes,
-        notifications: notifsRes,
-        ticketComments: commentsRes,
-        ticketRatings: ratingsRes,
-        currentUser: profileRes,
-        analytics: analyticsRes,
-        transfers: transfersRes,
-        audits: auditsRes,
-        handovers: handoversRes,
+        assets: extract(assetsRes, 'assets', []),
+        categories: extract(categoriesRes, 'categories', []),
+        maintenanceTickets: extract(maintenanceRes, 'maintenance', []),
+        transfers: extract(transfersRes, 'transfers', []),
+        audits: extract(auditsRes, 'audits', []),
+        disposals: extract(disposalsRes, 'disposals', []),
+        assetRequests: extract(requestsRes, 'requests', []),
+        reportsSummary: extract(reportsRes, 'reports', null),
+        workers: extract(workersRes, 'workers', []),
+        auditLogs: extract(auditLogsRes, 'auditLogs', []),
+        notifications: normalizedNotifs,
+        usersList: extract(usersRes, 'users', []),
+        failedEndpoints,
+        dbStatus: health?.database?.connected ? 'connected' : 'unknown',
       };
     } catch (err) {
-      return rejectWithValue(err.message);
+      return rejectWithValue({
+        type: 'INITIAL_FETCH_FAILED',
+        message: err.message || 'Failed to fetch initial application data.',
+      });
     }
   }
 );
 
-// 2. Ticket Async Operations
-export const createTicketAsync = createAsyncThunk(
-  'hostel/createTicketAsync',
-  async (ticketData, { rejectWithValue }) => {
-    try {
-      const created = await api.tickets.create(ticketData);
-      return created;
-    } catch (err) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-export const resolveTicketAsync = createAsyncThunk(
-  'hostel/resolveTicketAsync',
-  async ({ ticketId, notes, actor }, { rejectWithValue }) => {
-    try {
-      const resolved = await api.tickets.resolve(ticketId, { notes, actor });
-      return { ticketId, resolved, notes, actor };
-    } catch (err) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-export const assignWorkerAsync = createAsyncThunk(
-  'hostel/assignWorkerAsync',
-  async ({ ticketId, workerName, actor }, { rejectWithValue }) => {
-    try {
-      const updated = await api.tickets.assign(ticketId, workerName, actor);
-      return { ticketId, workerName, updated };
-    } catch (err) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-export const updateTicketPriorityAsync = createAsyncThunk(
-  'hostel/updateTicketPriorityAsync',
-  async ({ ticketId, priority }, { rejectWithValue }) => {
-    try {
-      const updated = await api.tickets.updatePriority(ticketId, priority);
-      return { ticketId, priority, updated };
-    } catch (err) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-export const bulkUpdateTicketStatusAsync = createAsyncThunk(
-  'hostel/bulkUpdateTicketStatusAsync',
-  async ({ ids, status }, { rejectWithValue }) => {
-    try {
-      await api.tickets.bulkUpdateStatus(ids, status);
-      return { ids, status };
-    } catch (err) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-export const addCommentAsync = createAsyncThunk(
-  'hostel/addCommentAsync',
-  async ({ ticketId, comment }, { rejectWithValue }) => {
-    try {
-      const created = await api.tickets.addComment(ticketId, comment);
-      return { ticketId, comment: created };
-    } catch (err) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-export const rateTicketAsync = createAsyncThunk(
-  'hostel/rateTicketAsync',
-  async ({ ticketId, rating }, { rejectWithValue }) => {
-    try {
-      const res = await api.tickets.rate(ticketId, rating);
-      return res;
-    } catch (err) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-// 3. Staff Request Async Operations
-export const submitStaffRequestAsync = createAsyncThunk(
-  'hostel/submitStaffRequestAsync',
-  async (requestData, { rejectWithValue }) => {
-    try {
-      const created = await api.requests.create(requestData);
-      return created;
-    } catch (err) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-export const approveStaffRequestAsync = createAsyncThunk(
-  'hostel/approveStaffRequestAsync',
-  async ({ id, actor, cost }, { rejectWithValue }) => {
-    try {
-      const approved = await api.requests.approve(id, actor);
-      return { id, approved, cost };
-    } catch (err) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-export const rejectStaffRequestAsync = createAsyncThunk(
-  'hostel/rejectStaffRequestAsync',
-  async ({ id, actor }, { rejectWithValue }) => {
-    try {
-      const rejected = await api.requests.reject(id, actor);
-      return { id, rejected };
-    } catch (err) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-export const bulkApproveStaffRequestsAsync = createAsyncThunk(
-  'hostel/bulkApproveStaffRequestsAsync',
-  async ({ ids, actor }, { rejectWithValue }) => {
-    try {
-      const res = await api.requests.bulkApprove(ids, actor);
-      return { ids, totalCost: res.totalCost };
-    } catch (err) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-// 4. Asset Async Operations
+// 2. Asset Operations
 export const createAssetAsync = createAsyncThunk(
-  'hostel/createAssetAsync',
+  'assetOps/createAssetAsync',
   async (assetData, { rejectWithValue }) => {
     try {
       const created = await api.assets.create(assetData);
@@ -211,8 +125,71 @@ export const createAssetAsync = createAsyncThunk(
   }
 );
 
+export const updateAssetAsync = createAsyncThunk(
+  'assetOps/updateAssetAsync',
+  async ({ tag, data }, { rejectWithValue }) => {
+    try {
+      const updated = await api.assets.update(tag, data);
+      return { tag, updated };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const deleteAssetAsync = createAsyncThunk(
+  'assetOps/deleteAssetAsync',
+  async (tag, { rejectWithValue }) => {
+    try {
+      await api.assets.delete(tag);
+      return tag;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+// 3. Category Operations
+export const createCategoryAsync = createAsyncThunk(
+  'assetOps/createCategoryAsync',
+  async (categoryData, { rejectWithValue }) => {
+    try {
+      const created = await api.assets.createCategory(categoryData);
+      return created;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+// 4. Allocation Operations
+export const allocateAssetAsync = createAsyncThunk(
+  'assetOps/allocateAssetAsync',
+  async (allocationData, { rejectWithValue }) => {
+    try {
+      const res = await api.assets.allocate(allocationData);
+      return res;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+// 5. Return & Transfer Operations
+export const returnAssetAsync = createAsyncThunk(
+  'assetOps/returnAssetAsync',
+  async (returnData, { rejectWithValue }) => {
+    try {
+      const res = await api.assets.returnAsset(returnData);
+      return res;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
 export const transferAssetAsync = createAsyncThunk(
-  'hostel/transferAssetAsync',
+  'assetOps/transferAssetAsync',
   async (transferData, { rejectWithValue }) => {
     try {
       const res = await api.assets.transfer(transferData);
@@ -223,94 +200,85 @@ export const transferAssetAsync = createAsyncThunk(
   }
 );
 
-export const recordAuditAsync = createAsyncThunk(
-  'hostel/recordAuditAsync',
+// 6. Maintenance Operations
+export const reportMaintenanceAsync = createAsyncThunk(
+  'assetOps/reportMaintenanceAsync',
+  async (ticketData, { rejectWithValue }) => {
+    try {
+      const created = await api.assets.reportMaintenance(ticketData);
+      return created;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const updateMaintenanceAsync = createAsyncThunk(
+  'assetOps/updateMaintenanceAsync',
+  async ({ ticketId, data }, { rejectWithValue }) => {
+    try {
+      const res = await api.assets.updateMaintenance(ticketId, data);
+      return res;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+// 7. Audit Operations
+export const submitAuditAsync = createAsyncThunk(
+  'assetOps/submitAuditAsync',
   async (auditData, { rejectWithValue }) => {
     try {
-      const res = await api.assets.submitAudit(auditData);
-      return res;
+      const created = await api.assets.submitAudit(auditData);
+      return created;
     } catch (err) {
       return rejectWithValue(err.message);
     }
   }
 );
 
-export const submitHandoverAsync = createAsyncThunk(
-  'hostel/submitHandoverAsync',
-  async (handoverData, { rejectWithValue }) => {
+// 8. Disposal Operations
+export const submitDisposalAsync = createAsyncThunk(
+  'assetOps/submitDisposalAsync',
+  async (disposalData, { rejectWithValue }) => {
     try {
-      const res = await api.assets.submitHandover(handoverData);
-      return res;
+      const created = await api.assets.submitDisposal(disposalData);
+      return created;
     } catch (err) {
       return rejectWithValue(err.message);
     }
   }
 );
 
-export const clearHandoverAsync = createAsyncThunk(
-  'hostel/clearHandoverAsync',
-  async ({ id, data }, { rejectWithValue }) => {
+// 9. Student Asset Request Operations
+export const submitAssetRequestAsync = createAsyncThunk(
+  'assetOps/submitAssetRequestAsync',
+  async (requestData, { rejectWithValue }) => {
     try {
-      const res = await api.assets.clearHandover(id, data);
-      return res;
+      const created = await api.assets.submitRequest(requestData);
+      return created;
     } catch (err) {
       return rejectWithValue(err.message);
     }
   }
 );
 
-export const retireAssetAsync = createAsyncThunk(
-  'hostel/retireAssetAsync',
-  async (tag, { rejectWithValue }) => {
+export const reviewAssetRequestAsync = createAsyncThunk(
+  'assetOps/reviewAssetRequestAsync',
+  async ({ requestId, data }, { rejectWithValue }) => {
     try {
-      const res = await api.assets.retire(tag);
-      return { tag, res };
+      const updated = await api.assets.reviewRequest(requestId, data);
+      return updated;
     } catch (err) {
       return rejectWithValue(err.message);
     }
   }
 );
 
-export const updateAssetConditionAsync = createAsyncThunk(
-  'hostel/updateAssetConditionAsync',
-  async ({ tag, condition, actor, cost, action }, { rejectWithValue }) => {
-    try {
-      const updated = await api.assets.updateCondition(tag, condition, actor, cost, action);
-      return { tag, condition, updated, cost, action };
-    } catch (err) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-export const addAssetMaintenanceRecordAsync = createAsyncThunk(
-  'hostel/addAssetMaintenanceRecordAsync',
-  async ({ tag, record }, { rejectWithValue }) => {
-    try {
-      const updated = await api.assets.addMaintenance(tag, record);
-      return { tag, record, updated };
-    } catch (err) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-// 5. Worker Async Operations
-export const toggleWorkerAvailabilityAsync = createAsyncThunk(
-  'hostel/toggleWorkerAvailabilityAsync',
-  async ({ id, availability }, { rejectWithValue }) => {
-    try {
-      const updated = await api.workers.toggleAvailability(id, availability);
-      return { id, availability, updated };
-    } catch (err) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-// 6. Notification Async Operations
+// 10. Notifications & Users
 export const markNotificationReadAsync = createAsyncThunk(
-  'hostel/markNotificationReadAsync',
+  'assetOps/markNotificationReadAsync',
   async (id, { rejectWithValue }) => {
     try {
       const updated = await api.notifications.markRead(id);
@@ -322,23 +290,22 @@ export const markNotificationReadAsync = createAsyncThunk(
 );
 
 export const markAllNotificationsReadAsync = createAsyncThunk(
-  'hostel/markAllNotificationsReadAsync',
+  'assetOps/markAllNotificationsReadAsync',
   async (_, { rejectWithValue }) => {
     try {
-      const all = await api.notifications.markAllRead();
-      return all;
+      await api.notifications.markAllRead();
+      return true;
     } catch (err) {
       return rejectWithValue(err.message);
     }
   }
 );
 
-// 7. Audit Log Async Operations
-export const addAuditEntryAsync = createAsyncThunk(
-  'hostel/addAuditEntryAsync',
-  async (entry, { rejectWithValue }) => {
+export const registerUserAsync = createAsyncThunk(
+  'assetOps/registerUserAsync',
+  async (userData, { rejectWithValue }) => {
     try {
-      const created = await api.audit.create(entry);
+      const created = await api.auth.registerUser(userData);
       return created;
     } catch (err) {
       return rejectWithValue(err.message);
@@ -346,948 +313,448 @@ export const addAuditEntryAsync = createAsyncThunk(
   }
 );
 
+// 11. Profile Update
+export const updateProfileAsync = createAsyncThunk(
+  'assetOps/updateProfileAsync',
+  async (profileData, { rejectWithValue }) => {
+    try {
+      const res = await api.auth.updateProfile(profileData);
+      return res.user;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
 /* ══════════════════════════════════════════════════════════
-   INITIAL STATE
+   INITIAL STATE & SESSION RESTORATION
 ══════════════════════════════════════════════════════════ */
+const storedSession = getStoredSession();
+
 const initialState = {
-  /* ── Network & Connection Status ── */
+  /* Connection & Status */
   isLoading: false,
   isBackendConnected: false,
+  dbStatus: 'unknown', // 'connected' | 'disconnected' | 'unknown'
+  connectionError: null,
   apiError: null,
-  authToken: null,
-  isAuthenticated: false,
+  authToken: storedSession ? storedSession.token : null,
+  isAuthenticated: !!(storedSession && storedSession.user),
 
-  /* ── Navigation & Layout ── */
-  currentRole: 'login',
-  currentPage: 'login',
-  viewMode: 'desktop',          // 'mobile' | 'desktop'
-  layoutMode: 'bento',          // 'bento' | 'cyber' | 'studio' | 'dual'
-  selectedTicketId: null,
-  isLoading: false,
-  isBackendConnected: false,
-  apiError: null,
+  /* Roles & Persona */
+  currentRole: storedSession?.user?.role || 'login', // 'login' | 'admin' | 'user' | 'staff' | 'student'
+  adminType: storedSession?.user?.admin_type || (storedSession?.user?.role === 'admin' ? 'superadmin' : ''),
+  currentUser: storedSession?.user || null,
+  rememberMe: storedSession?.remember ?? true,
 
-  /* ── Customization & Atmosphere ── */
-  themeMode: 'light',           // 'dark' | 'light'
-  colorTheme: 'purple',         // 'purple'|'cyan'|'green'|'orange'|'red'|'pink'|'cyber'|'gold'|'frost'
-  backgroundEffect: 'particles',// 'particles' | 'grid' | 'aura' | 'minimal'
-  radiusMode: 'smooth',         // 'sharp' | 'smooth' | 'round'
-  soundEnabled: true,
-  language: 'en',               // 'en' | 'hi' | 'ta' | 'te' | 'es' | 'fr'
-  fontStyle: 'inter',           // 'inter' | 'dm-sans' | 'outfit' | 'nunito'
-  fontSize: 'normal',           // 'compact' | 'normal' | 'comfortable' | 'large'
+  /* Active Navigation Tab */
+  activeTab: 'register',
 
-  /* ── Current User ── */
-  currentUser: {
-    name: 'Himachalam',
-    initials: 'HC',
-    room: 'A-204',
-    block: 'Block A',
-    floor: 'Floor 2',
-    rollNumber: '21CS204',
-    email: 'hima@hostel.edu',
-    phone: '+91 98765 43210',
-  },
+  /* UI Preferences */
+  viewMode: 'desktop',
+  themeMode: 'light',
+  colorTheme: 'cyan',
+  fontStyle: 'inter',
+  fontSize: 'normal',
 
-  /* ── Toast Notifications (UI) ── */
-  toasts: [],
+  /* 10 Lifecycle Data Collections */
+  assets: [],
+  categories: [],
+  maintenanceTickets: [],
+  transfers: [],
+  audits: [],
+  disposals: [],
+  assetRequests: [],
+  reportsSummary: null,
+  workers: [],
+  auditLogs: [],
+  notifications: [],
+  usersList: [],
 
-  /* ── Interactive Modals & Drawers ── */
-  drawerTicketId: null,
-  aiDrawerOpen: false,
-  floorplanModalOpen: false,
+  /* Modals & Overlays */
+  selectedAssetTag: null,
+  qrScannerModalOpen: false,
+  newAssetModalOpen: false,
+  allocateModalOpen: false,
+  transferModalOpen: false,
+  returnModalOpen: false,
+  maintenanceModalOpen: false,
+  disposalModalOpen: false,
+  auditModalOpen: false,
+  requestAssetModalOpen: false,
   profileModalOpen: false,
-  selectedRoomId: null,
+  settingsModalOpen: false,
+  qrPreviewTag: null,
 
-  /* ── Ticket Comments (ticketId → [{id,author,role,text,time}]) ── */
-  ticketComments: {
-    'TKT-312': [
-      { id: 'C1', author: 'Dr. Meena Sharma', role: 'Asst. Warden', text: 'Worker has been dispatched. Should be resolved by evening.', time: '2 hrs ago' },
-      { id: 'C2', author: 'Sarathi Kamal', role: 'Technician', text: 'On site. Checking the pipe joint now.', time: '1 hr ago' },
-    ],
-    'TKT-318': [
-      { id: 'C3', author: 'Dr. Meena Sharma', role: 'Asst. Warden', text: 'High priority — please handle ASAP. Safety concern.', time: '20 min ago' },
-    ],
-  },
+  /* Filters & Search */
+  searchQuery: '',
+  selectedCategoryFilter: 'All',
+  selectedConditionFilter: 'All',
+  selectedStatusFilter: 'All',
+  selectedBlockFilter: 'All',
 
-  /* ── Ticket Satisfaction Ratings (ticketId → 1-5) ── */
-  ticketRatings: {
-    'TKT-315': 4,
-    'TKT-319': 5,
-  },
-
-  /* ── Notifications ── */
-  notifications: [
-    { id: 'N1', message: 'Your ticket TKT-312 has been assigned to Sarathi Kamal', type: 'info',    isRead: false, time: '10 min ago' },
-    { id: 'N2', message: 'TKT-315 Internet Outage has been resolved',               type: 'success', isRead: false, time: '2 hrs ago' },
-    { id: 'N3', message: 'New complaint logged in Block A — Room 309',              type: 'warn',    isRead: true,  time: '1 day ago' },
-    { id: 'N4', message: 'Principal approved REQ-4092 — ₹45,000 released',         type: 'success', isRead: true,  time: '2 days ago' },
-  ],
-
-  /* ── Tickets ── */
-  tickets: [
-    { id: 'TKT-312', title: 'Plumbing Issue in Washroom',   student: 'Himachalam',     room: 'A-204', category: 'Plumbing',    priority: 'High',   status: 'In Progress', assignedWorker: 'Sarathi Kamal', assetTag: 'QR-A204-PLM-01', createdAt: '2 days ago',  creatorRole: 'Student', description: 'Water leaking from the tap joint near the washbasin. Has been dripping for 3 days.' },
-    { id: 'TKT-314', title: 'AC Not Cooling Properly',       student: 'Naveen',         room: 'A-112', category: 'Electrical',  priority: 'Medium', status: 'Pending',     assignedWorker: 'Unassigned',   assetTag: 'QR-A112-AC-01',  createdAt: '5 hours ago', creatorRole: 'Student', description: 'The AC runs but does not cool below 26°C even at full setting.' },
-    { id: 'TKT-315', title: 'Internet Outage',               student: 'Devansh Chouhan',room: 'A-309', category: 'Networking',  priority: 'Low',    status: 'Resolved',    assignedWorker: 'Dhariq Anwar', assetTag: 'QR-A309-RTR-01', createdAt: '1 week ago',  creatorRole: 'Student', description: 'No internet connectivity on the entire floor. Router seems down.' },
-    { id: 'TKT-318', title: 'Geyser Sparking',               student: 'Venkatesh',      room: 'A-215', category: 'Electrical',  priority: 'High',   status: 'In Progress', assignedWorker: 'Mohan Kumar',  assetTag: 'QR-A215-GYS-01', createdAt: '1 day ago',   creatorRole: 'Student', description: 'Electric geyser is sparking when switched on. Potential fire hazard.' },
-    { id: 'TKT-319', title: 'Power Socket Repair',           student: 'Nickson',        room: 'A-101', category: 'Electrical',  priority: 'Low',    status: 'Resolved',    assignedWorker: 'Sarathi Kamal',assetTag: 'QR-A101-SKT-02', createdAt: '4 days ago',  creatorRole: 'Student', description: 'Wall socket near desk is loose and does not hold plug properly.' },
-    { id: 'TKT-320', title: 'Ceiling Fan Noise',             student: 'Arjun',          room: 'B-304', category: 'Electrical',  priority: 'High',   status: 'Pending',     assignedWorker: 'Unassigned',   assetTag: 'QR-B304-FAN-01', createdAt: '3 hours ago', creatorRole: 'Student', description: 'Fan makes loud grinding sound, worse at high speed.' },
-    { id: 'TKT-321', title: 'Broken Chair Leg',              student: 'Priya',          room: 'C-201', category: 'Furniture',   priority: 'Low',    status: 'Pending',     assignedWorker: 'Unassigned',   assetTag: 'QR-C201-CHR-02', createdAt: '6 hours ago', creatorRole: 'Student', description: 'Study chair front leg is cracked and unstable.' },
-    { id: 'TKT-322', title: 'Bathroom Door Latch Broken',    student: 'Himachalam',     room: 'A-204', category: 'Furniture',   priority: 'Medium', status: 'Pending',     assignedWorker: 'Unassigned',   assetTag: 'QR-A204-DR-01',  createdAt: '1 hour ago',  creatorRole: 'Student', description: 'Bathroom door latch does not lock from inside.' },
-  ],
-
-  /* ── Ticket Volume (last 7 days) for trend charts ── */
-  ticketVolume7d: [3, 5, 2, 8, 4, 6, 7],
-  ticketVolume30d: [12, 9, 15, 8, 11, 14, 10, 7, 9, 13, 11, 8, 6, 10, 12, 15, 9, 8, 11, 14, 10, 7, 9, 13, 11, 8, 6, 10, 12, 15],
-  budgetBurn7d: [310000, 318000, 322000, 328000, 332000, 337000, 340000],
-
-  /* ── Staff Requests ── */
-  staffRequests: [
-    { id: 'REQ-4092', title: 'Mess Chimney Replacement',    dept: 'Mess & Dining', cost: 45000,  status: 'Pending Res. Warden', time: 'Submitted today',      submittedBy: 'Sanji' },
-    { id: 'REQ-4080', title: 'Hostel B Plumbing Overhaul',  dept: 'Maintenance',   cost: 120000, status: 'Pending Principal',   time: '27 Jul, 02:15 PM',     submittedBy: 'Rajan Kumar' },
-    { id: 'REQ-4055', title: 'CCTV System Upgrade',         dept: 'Security',      cost: 85000,  status: 'Pending Principal',   time: '26 Jul, 09:00 AM',     submittedBy: 'Durai Selvam' },
-    { id: 'REQ-4031', title: 'Kitchen Exhaust Fan',         dept: 'Mess & Dining', cost: 8500,   status: 'Approved',            time: '28 Nov 2024, 11:00 AM', submittedBy: 'Sanji' },
-    { id: 'REQ-4010', title: 'Gas Pipeline Repair',         dept: 'Maintenance',   cost: 12000,  status: 'Approved',            time: '12 Jan 2025, 09:30 AM', submittedBy: 'Rajan Kumar' },
-  ],
-
-  /* ── Workers ── */
-  workers: [
-    { id: 'W1', name: 'Sarathi Kamal', skill: 'Electrician', phone: '+91 98765 43210', availability: 'Available', jobs: 2, rating: 4.8, completedJobs: 142 },
-    { id: 'W2', name: 'Dhariq Anwar',  skill: 'Plumber',     phone: '+91 98765 09987', availability: 'Busy',      jobs: 4, rating: 4.6, completedJobs: 98  },
-    { id: 'W3', name: 'Mohan Kumar',   skill: 'Electrician', phone: '+91 98765 54321', availability: 'Available', jobs: 1, rating: 4.7, completedJobs: 210 },
-    { id: 'W4', name: 'Selvam R.',     skill: 'Carpenter',   phone: '+91 98765 11122', availability: 'Available', jobs: 0, rating: 4.5, completedJobs: 76  },
-    { id: 'W5', name: 'Rajan M.',      skill: 'Plumber',     phone: '+91 98765 66677', availability: 'Busy',      jobs: 3, rating: 4.9, completedJobs: 183 },
-  ],
-
-  /* ── Physical Asset Inventory ── */
-  assets: [
-    {
-      tag: 'HST-A204-BED-01',
-      name: 'Single Wooden Cot Bed',
-      category: 'Furniture',
-      block: 'Block A',
-      floor: 'Floor 2',
-      room: '204',
-      location: 'Block A - Room 204',
-      condition: 'Good',
-      status: 'Assigned',
-      purchaseDate: '2024-06-12',
-      purchaseCost: 8500,
-      currentValue: 7225,
-      depreciationRate: 10,
-      warrantyExpiry: '2027-06-12',
-      supplier: 'Apex Institutional Furnishings Ltd.',
-      assignedStudent: { roll: '21CS204', name: 'Himachalam' },
-      lastChecked: 'Today',
-      qrCodeData: 'HOSTELOPS:HST-A204-BED-01',
-      maintenanceHistory: [
-        { date: '10 Aug 2025', action: 'Annual inspection — In solid condition', actor: 'Dr. Meena Sharma', cost: 0, color: 'var(--accent-green)' },
-      ],
-    },
-    {
-      tag: 'HST-A204-TBL-01',
-      name: 'Ergonomic Study Table',
-      category: 'Furniture',
-      block: 'Block A',
-      floor: 'Floor 2',
-      room: '204',
-      location: 'Block A - Room 204',
-      condition: 'Good',
-      status: 'Assigned',
-      purchaseDate: '2024-06-12',
-      purchaseCost: 4500,
-      currentValue: 3825,
-      depreciationRate: 10,
-      warrantyExpiry: '2027-06-12',
-      supplier: 'Apex Institutional Furnishings Ltd.',
-      assignedStudent: { roll: '21CS204', name: 'Himachalam' },
-      lastChecked: 'Today',
-      qrCodeData: 'HOSTELOPS:HST-A204-TBL-01',
-      maintenanceHistory: [
-        { date: '15 Jan 2025', action: 'Edge lamination touch-up', actor: 'Selvam R.', cost: 150, color: 'var(--accent-cyan)' },
-      ],
-    },
-    {
-      tag: 'HST-A204-CHR-01',
-      name: 'Cushioned Study Chair',
-      category: 'Furniture',
-      block: 'Block A',
-      floor: 'Floor 2',
-      room: '204',
-      location: 'Block A - Room 204',
-      condition: 'Good',
-      status: 'Assigned',
-      purchaseDate: '2024-06-12',
-      purchaseCost: 2800,
-      currentValue: 2380,
-      depreciationRate: 10,
-      warrantyExpiry: '2026-06-12',
-      supplier: 'Apex Institutional Furnishings Ltd.',
-      assignedStudent: { roll: '21CS204', name: 'Himachalam' },
-      lastChecked: 'Today',
-      qrCodeData: 'HOSTELOPS:HST-A204-CHR-01',
-      maintenanceHistory: [],
-    },
-    {
-      tag: 'HST-A204-FAN-01',
-      name: 'Ceiling Fan 1200mm',
-      category: 'Electrical',
-      block: 'Block A',
-      floor: 'Floor 2',
-      room: '204',
-      location: 'Block A - Room 204',
-      condition: 'Needs Repair',
-      status: 'Assigned',
-      purchaseDate: '2024-06-12',
-      purchaseCost: 2400,
-      currentValue: 2040,
-      depreciationRate: 10,
-      warrantyExpiry: '2026-12-12',
-      supplier: 'Havells Institutional Direct',
-      assignedStudent: { roll: '21CS204', name: 'Himachalam' },
-      lastChecked: 'Today',
-      qrCodeData: 'HOSTELOPS:HST-A204-FAN-01',
-      maintenanceHistory: [
-        { date: '18 Sep 2026', action: 'Regulator noise reported by resident', actor: 'Himachalam', cost: 0, color: 'var(--accent-yellow)' },
-      ],
-    },
-    {
-      tag: 'HST-A204-ALM-01',
-      name: 'Steel Storage Almirah',
-      category: 'Furniture',
-      block: 'Block A',
-      floor: 'Floor 2',
-      room: '204',
-      location: 'Block A - Room 204',
-      condition: 'Good',
-      status: 'Assigned',
-      purchaseDate: '2024-06-12',
-      purchaseCost: 11000,
-      currentValue: 9350,
-      depreciationRate: 10,
-      warrantyExpiry: '2029-06-12',
-      supplier: 'Godrej Security & Steel',
-      assignedStudent: { roll: '21CS204', name: 'Himachalam' },
-      lastChecked: 'Today',
-      qrCodeData: 'HOSTELOPS:HST-A204-ALM-01',
-      maintenanceHistory: [],
-    },
-    {
-      tag: 'HST-B112-FAN-02',
-      name: 'Ceiling Fan 1200mm',
-      category: 'Electrical',
-      block: 'Block B',
-      floor: 'Floor 1',
-      room: '112',
-      location: 'Block B - Room 112',
-      condition: 'Damaged',
-      status: 'Assigned',
-      purchaseDate: '2024-01-10',
-      purchaseCost: 2500,
-      currentValue: 2000,
-      depreciationRate: 10,
-      warrantyExpiry: '2026-01-10',
-      supplier: 'Havells Institutional Direct',
-      assignedStudent: { roll: '21EC112', name: 'Sundar' },
-      lastChecked: '01 Aug 2025',
-      qrCodeData: 'HOSTELOPS:HST-B112-FAN-02',
-      maintenanceHistory: [{ date: '01 Aug 2025', action: 'Blade bent & motor jammed — marked damaged', actor: 'Dr. Meena Sharma', cost: 0, color: 'var(--accent-red)' }],
-    },
-    {
-      tag: 'HST-C208-LGT-01',
-      name: 'LED Tube 20W',
-      category: 'Electrical',
-      block: 'Block C',
-      floor: 'Floor 2',
-      room: '208',
-      location: 'Block C - Room 208',
-      condition: 'Under Maintenance',
-      status: 'Under Maintenance',
-      purchaseDate: '2025-02-14',
-      purchaseCost: 800,
-      currentValue: 720,
-      depreciationRate: 10,
-      warrantyExpiry: '2027-02-14',
-      supplier: 'Philips Lighting India',
-      assignedStudent: { roll: '21CS208', name: 'Janaki' },
-      lastChecked: '08 Aug 2025',
-      qrCodeData: 'HOSTELOPS:HST-C208-LGT-01',
-      maintenanceHistory: [{ date: '08 Aug 2025', action: 'Driver capacitor replacement ongoing', actor: 'Sarathi Kamal', cost: 120, color: 'var(--accent-primary)' }],
-    },
-    {
-      tag: 'HST-STR-CHR-04',
-      name: 'Spare Study Chair',
-      category: 'Furniture',
-      block: 'Central Store',
-      floor: 'Floor 1',
-      room: 'Store Room',
-      location: 'Central Store - Floor 1',
-      condition: 'Good',
-      status: 'In Store',
-      purchaseDate: '2025-05-10',
-      purchaseCost: 2200,
-      currentValue: 2200,
-      depreciationRate: 10,
-      warrantyExpiry: '2027-05-10',
-      supplier: 'Apex Institutional Furnishings Ltd.',
-      assignedStudent: { roll: '', name: '' },
-      lastChecked: 'Yesterday',
-      qrCodeData: 'HOSTELOPS:HST-STR-CHR-04',
-      maintenanceHistory: [],
-    },
-    {
-      tag: 'HST-STR-MAT-01',
-      name: 'Coir Mattress Single',
-      category: 'Furniture',
-      block: 'Central Store',
-      floor: 'Floor 1',
-      room: 'Store Room',
-      location: 'Central Store - Floor 1',
-      condition: 'Good',
-      status: 'In Store',
-      purchaseDate: '2025-06-01',
-      purchaseCost: 3500,
-      currentValue: 3500,
-      depreciationRate: 10,
-      warrantyExpiry: '2028-06-01',
-      supplier: 'Kurl-On Institutional',
-      assignedStudent: { roll: '', name: '' },
-      lastChecked: 'Yesterday',
-      qrCodeData: 'HOSTELOPS:HST-STR-MAT-01',
-      maintenanceHistory: [],
-    },
-  ],
-
-  /* ── Asset Transfers & Movement History ── */
-  transfers: [
-    { id: 'TR-101', assetTag: 'HST-A204-TBL-01', assetName: 'Study Table', from: 'Block A - Room 102', to: 'Block A - Room 204', transferredBy: 'Dr. Meena Sharma', date: '2026-08-10', reason: 'Student room allotment' },
-    { id: 'TR-102', assetTag: 'HST-STR-CHR-04', assetName: 'Study Chair', from: 'Central Store - Floor 1', to: 'Block B - Room 205', transferredBy: 'Asset Manager', date: '2026-08-15', reason: 'Replacement for broken chair' },
-  ],
-
-  /* ── Physical Asset Audits ── */
-  audits: [
-    { auditId: 'AUD-9021', block: 'Block A', room: '204', auditor: 'Dr. Meena Sharma', date: '2026-09-19', expectedCount: 5, scannedCount: 5, missingCount: 0, status: 'Verified 100%' },
-    { auditId: 'AUD-9018', block: 'Block B', room: '112', auditor: 'Dr. Meena Sharma', date: '2026-09-17', expectedCount: 5, scannedCount: 4, missingCount: 1, status: 'Discrepancy Found' },
-  ],
-
-  /* ── Student Handover Clearances ── */
-  handovers: [
-    {
-      handoverId: 'CLR-7701',
-      studentRoll: '21CS204',
-      studentName: 'Himachalam',
-      room: 'A-204',
-      block: 'Block A',
-      date: '2026-09-20',
-      items: [
-        { tag: 'HST-A204-BED-01', name: 'Single Wooden Cot Bed', condition: 'Good', verified: true },
-        { tag: 'HST-A204-TBL-01', name: 'Ergonomic Study Table', condition: 'Good', verified: true },
-        { tag: 'HST-A204-CHR-01', name: 'Cushioned Study Chair', condition: 'Good', verified: true },
-        { tag: 'HST-A204-FAN-01', name: 'Ceiling Fan 1200mm', condition: 'Needs Repair', verified: true },
-        { tag: 'HST-A204-ALM-01', name: 'Steel Storage Almirah', condition: 'Good', verified: true },
-      ],
-      status: 'Pending Review',
-      clearedBy: 'Pending Warden',
-      penaltyAmount: 0,
-      remarks: 'End of semester routine clearance',
-    },
-  ],
-
-  /* ── Audit Log ── */
-  auditLog: [
-    { id: 'AL-001', action: 'Ticket Created',          actor: 'Himachalam (Student)',    target: 'TKT-312',  timestamp: '2026-08-22 08:14 AM', category: 'Ticket' },
-    { id: 'AL-002', action: 'Worker Assigned',         actor: 'Dr. Meena Sharma (AW)',  target: 'TKT-312',  timestamp: '2026-08-22 09:30 AM', category: 'Assignment' },
-    { id: 'AL-003', action: 'Staff Request Submitted', actor: 'Sanji (Staff)',           target: 'REQ-4092', timestamp: '2026-08-24 10:00 AM', category: 'Request' },
-    { id: 'AL-004', action: 'Request Endorsed',        actor: 'Dr. Meena Sharma (AW)',  target: 'REQ-4092', timestamp: '2026-08-24 10:15 AM', category: 'Approval' },
-    { id: 'AL-005', action: 'Ticket Resolved',         actor: 'Dhariq Anwar (Worker)',  target: 'TKT-315',  timestamp: '2026-08-23 04:45 PM', category: 'Ticket' },
-    { id: 'AL-006', action: 'Asset Condition Updated', actor: 'Dr. Meena Sharma (AW)',  target: 'QR-B112-FAN-02', timestamp: '2026-08-21 11:00 AM', category: 'Asset' },
-    { id: 'AL-007', action: 'Request Approved',        actor: 'Prof. R. Iyer (RW)',     target: 'REQ-4031', timestamp: '2026-08-20 03:15 PM', category: 'Approval' },
-    { id: 'AL-008', action: 'Notification Sent',       actor: 'System',                 target: 'Himachalam',timestamp: '2026-08-22 09:31 AM', category: 'System' },
-  ],
-
-  /* ── Budget ── */
-  budget: {
-    total: 500000,
-    spent: 340000,
-    pending: 115000,
-    categories: [
-      { name: 'Electrical',  spent: 98000,  budget: 140000 },
-      { name: 'Plumbing',    spent: 72000,  budget: 100000 },
-      { name: 'Furniture',   spent: 45000,  budget: 80000  },
-      { name: 'Appliances',  spent: 85000,  budget: 120000 },
-      { name: 'Networking',  spent: 40000,  budget: 60000  },
-    ],
-  },
-
-  /* ── Room Matrix (Hostel Floorplan) ── */
-  roomMatrix: [
-    { id: 'A-101', block: 'Block A', floor: 1, student: 'Nickson',         status: 'normal',   activeTickets: ['TKT-319'], assets: { ac: 'good', fan: 'good', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'good', light: 'good' } },
-    { id: 'A-102', block: 'Block A', floor: 1, student: 'Arjun Rajan',     status: 'normal',   activeTickets: [],          assets: { ac: 'good', fan: 'good', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'good', light: 'good' } },
-    { id: 'A-103', block: 'Block A', floor: 1, student: 'Vishnu',          status: 'warning',  activeTickets: [],          assets: { ac: 'needs_repair', fan: 'good', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'good', light: 'good' } },
-    { id: 'A-201', block: 'Block A', floor: 2, student: 'Ramkumar',        status: 'normal',   activeTickets: [],          assets: { ac: 'good', fan: 'good', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'good', light: 'good' } },
-    { id: 'A-204', block: 'Block A', floor: 2, student: 'Himachalam',      status: 'critical', activeTickets: ['TKT-312', 'TKT-322'], assets: { ac: 'good', fan: 'good', plumbing: 'needs_repair', wifi: 'good', desk: 'good', geyser: 'good', light: 'good' } },
-    { id: 'A-205', block: 'Block A', floor: 2, student: 'Suresh M.',       status: 'normal',   activeTickets: [],          assets: { ac: 'good', fan: 'good', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'good', light: 'good' } },
-    { id: 'A-112', block: 'Block A', floor: 1, student: 'Naveen',          status: 'warning',  activeTickets: ['TKT-314'], assets: { ac: 'needs_repair', fan: 'good', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'good', light: 'good' } },
-    { id: 'A-215', block: 'Block A', floor: 2, student: 'Venkatesh',       status: 'critical', activeTickets: ['TKT-318'], assets: { ac: 'good', fan: 'good', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'damaged', light: 'good' } },
-    { id: 'A-309', block: 'Block A', floor: 3, student: 'Devansh Chouhan', status: 'normal',   activeTickets: [],          assets: { ac: 'good', fan: 'good', plumbing: 'good', wifi: 'needs_repair', desk: 'good', geyser: 'good', light: 'good' } },
-    { id: 'A-310', block: 'Block A', floor: 3, student: 'Karthik S.',      status: 'normal',   activeTickets: [],          assets: { ac: 'good', fan: 'good', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'good', light: 'good' } },
-    { id: 'B-101', block: 'Block B', floor: 1, student: 'Harish V.',       status: 'normal',   activeTickets: [],          assets: { ac: 'good', fan: 'good', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'good', light: 'good' } },
-    { id: 'B-112', block: 'Block B', floor: 1, student: 'Sundar',          status: 'warning',  activeTickets: [],          assets: { ac: 'good', fan: 'damaged', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'good', light: 'good' } },
-    { id: 'B-205', block: 'Block B', floor: 2, student: 'Praveen K.',      status: 'normal',   activeTickets: [],          assets: { ac: 'good', fan: 'good', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'good', light: 'good' } },
-    { id: 'B-304', block: 'Block B', floor: 3, student: 'Arjun',           status: 'critical', activeTickets: ['TKT-320'], assets: { ac: 'good', fan: 'damaged', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'good', light: 'good' } },
-    { id: 'C-201', block: 'Block C', floor: 2, student: 'Priya',           status: 'warning',  activeTickets: ['TKT-321'], assets: { ac: 'good', fan: 'good', plumbing: 'good', wifi: 'good', desk: 'needs_repair', geyser: 'good', light: 'good' } },
-    { id: 'C-208', block: 'Block C', floor: 2, student: 'Janaki',          status: 'warning',  activeTickets: [],          assets: { ac: 'good', fan: 'good', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'good', light: 'needs_repair' } },
-    { id: 'C-302', block: 'Block C', floor: 3, student: 'Meenakshi',       status: 'normal',   activeTickets: [],          assets: { ac: 'good', fan: 'good', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'good', light: 'good' } },
-    { id: 'D-101', block: 'Block D', floor: 1, student: 'Lingesh',         status: 'normal',   activeTickets: [],          assets: { ac: 'good', fan: 'good', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'good', light: 'good' } },
-    { id: 'D-204', block: 'Block D', floor: 2, student: 'Dharani',         status: 'normal',   activeTickets: [],          assets: { ac: 'good', fan: 'good', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'good', light: 'good' } },
-    { id: 'D-305', block: 'Block D', floor: 3, student: 'Mithun R.',       status: 'normal',   activeTickets: [],          assets: { ac: 'good', fan: 'good', plumbing: 'good', wifi: 'good', desk: 'good', geyser: 'good', light: 'good' } },
-  ],
+  /* Toast Alerts */
+  toasts: [],
 };
 
 export const ticketSlice = createSlice({
-  name: 'hostel',
+  name: 'ticketStore',
   initialState,
   reducers: {
-    /* ── Navigation & Auth ── */
+    loginSuccess: (state, action) => {
+      const { user, token, remember } = action.payload;
+      state.isAuthenticated = true;
+      state.currentUser = user;
+      state.authToken = token;
+      state.currentRole = user.role || 'user';
+      state.adminType = user.admin_type || (user.role === 'admin' ? 'superadmin' : '');
+      state.rememberMe = !!remember;
+      saveSession({ user, token, remember });
+    },
+    logout: (state) => {
+      state.isAuthenticated = false;
+      state.currentUser = null;
+      state.authToken = null;
+      state.currentRole = 'login';
+      state.adminType = '';
+      clearSession();
+    },
+    setConnectionStatus: (state, action) => {
+      state.isBackendConnected = action.payload.isBackendConnected;
+      state.dbStatus = action.payload.dbStatus || state.dbStatus;
+      state.connectionError = action.payload.error || null;
+    },
     setRole: (state, action) => {
-      const payload = action.payload;
-      const role = (typeof payload === 'object' && payload?.role) ? payload.role : payload;
-      state.currentRole = role;
-      if (typeof payload === 'object' && payload !== null) {
-        if (payload.token) {
-          state.authToken = payload.token;
-          state.isAuthenticated = true;
-          try { localStorage.setItem('hostelops_jwt', payload.token); } catch (_) {}
-        }
-        if (payload.user) {
-          state.currentUser = { ...state.currentUser, ...payload.user };
-        }
-      }
-      if (role === 'login') {
-        state.isAuthenticated = false;
-        state.authToken = null;
-        try { localStorage.removeItem('hostelops_jwt'); } catch (_) {}
-      }
-      const defaultPages = {
-        login: 'login', student: 'home', staff: 'dashboard',
-        'asst-warden': 'dashboard', 'res-warden': 'dashboard',
-        technician: 'feed', assets: 'registry', principal: 'dashboard',
-      };
-      state.currentPage = defaultPages[role] || 'home';
+      state.currentRole = action.payload;
     },
-    setPage: (state, action) => { state.currentPage = action.payload; },
-    setViewMode: (state, action) => { state.viewMode = action.payload; },
-    setLayoutMode: (state, action) => { state.layoutMode = action.payload; },
-    selectTicket: (state, action) => { state.selectedTicketId = action.payload; },
-
-    /* ── Interactive Overlays ── */
-    openTicketDrawer: (state, action) => { state.drawerTicketId = action.payload; },
-    closeTicketDrawer: (state) => { state.drawerTicketId = null; },
-    setAiDrawerOpen: (state, action) => { state.aiDrawerOpen = action.payload; },
-    setFloorplanModalOpen: (state, action) => { state.floorplanModalOpen = action.payload; },
-    setProfileModalOpen: (state, action) => { state.profileModalOpen = action.payload; },
-    setSelectedRoomId: (state, action) => { state.selectedRoomId = action.payload; },
-    updateRoomAssetStatus: (state, action) => {
-      /* payload: { roomId, assetKey, status } — updates room asset status in roomMatrix */
-      const { roomId, assetKey, status } = action.payload;
-      const room = state.roomMatrix.find((r) => r.id === roomId);
-      if (room && room.assets && assetKey) {
-        room.assets[assetKey] = status;
-        // Recalculate room status based on assets
-        const vals = Object.values(room.assets);
-        if (vals.some((v) => v === 'damaged')) room.status = 'critical';
-        else if (vals.some((v) => v === 'needs_repair')) room.status = 'warning';
-        else room.status = 'normal';
+    setAdminType: (state, action) => {
+      state.adminType = action.payload;
+    },
+    setCurrentUser: (state, action) => {
+      state.currentUser = action.payload;
+      if (action.payload?.role) state.currentRole = action.payload.role;
+      if (action.payload?.admin_type) state.adminType = action.payload.admin_type;
+      if (state.authToken && action.payload) {
+        saveSession({ user: action.payload, token: state.authToken, remember: state.rememberMe });
       }
     },
-
-    /* ── User Profile ── */
-    updateUserProfile: (state, action) => {
-      state.currentUser = { ...state.currentUser, ...action.payload };
-      // Update initials if name changed
-      if (action.payload.name) {
-        state.currentUser.initials = action.payload.name
-          .split(' ')
-          .map((n) => n[0])
-          .join('')
-          .toUpperCase()
-          .slice(0, 2);
-      }
+    setActiveTab: (state, action) => {
+      state.activeTab = action.payload;
     },
-
-    /* ── Toast System ── */
+    setViewMode: (state, action) => {
+      state.viewMode = action.payload;
+    },
+    setThemeMode: (state, action) => {
+      state.themeMode = action.payload;
+    },
+    setColorTheme: (state, action) => {
+      state.colorTheme = action.payload;
+    },
+    setFontStyle: (state, action) => {
+      state.fontStyle = action.payload;
+    },
+    setFontSize: (state, action) => {
+      state.fontSize = action.payload;
+    },
+    setSelectedAssetTag: (state, action) => {
+      state.selectedAssetTag = action.payload;
+    },
+    setQrPreviewTag: (state, action) => {
+      state.qrPreviewTag = action.payload;
+    },
+    setSearchQuery: (state, action) => {
+      state.searchQuery = action.payload;
+    },
+    setCategoryFilter: (state, action) => {
+      state.selectedCategoryFilter = action.payload;
+    },
+    setConditionFilter: (state, action) => {
+      state.selectedConditionFilter = action.payload;
+    },
+    setStatusFilter: (state, action) => {
+      state.selectedStatusFilter = action.payload;
+    },
+    setBlockFilter: (state, action) => {
+      state.selectedBlockFilter = action.payload;
+    },
+    setQrScannerModalOpen: (state, action) => {
+      state.qrScannerModalOpen = action.payload;
+    },
+    setNewAssetModalOpen: (state, action) => {
+      state.newAssetModalOpen = action.payload;
+    },
+    setAllocateModalOpen: (state, action) => {
+      state.allocateModalOpen = action.payload;
+    },
+    setTransferModalOpen: (state, action) => {
+      state.transferModalOpen = action.payload;
+    },
+    setReturnModalOpen: (state, action) => {
+      state.returnModalOpen = action.payload;
+    },
+    setMaintenanceModalOpen: (state, action) => {
+      state.maintenanceModalOpen = action.payload;
+    },
+    setDisposalModalOpen: (state, action) => {
+      state.disposalModalOpen = action.payload;
+    },
+    setAuditModalOpen: (state, action) => {
+      state.auditModalOpen = action.payload;
+    },
+    setRequestAssetModalOpen: (state, action) => {
+      state.requestAssetModalOpen = action.payload;
+    },
+    setProfileModalOpen: (state, action) => {
+      state.profileModalOpen = action.payload;
+    },
+    setSettingsModalOpen: (state, action) => {
+      state.settingsModalOpen = action.payload;
+    },
     addToast: (state, action) => {
-      state.toasts.push(action.payload);
-    },
-    removeToast: (state, action) => {
-      state.toasts = state.toasts.filter(t => t.id !== action.payload);
-    },
-
-    /* ── Comments ── */
-    addComment: (state, action) => {
-      const { ticketId, comment } = action.payload;
-      if (!state.ticketComments[ticketId]) state.ticketComments[ticketId] = [];
-      state.ticketComments[ticketId].push(comment);
-    },
-
-    /* ── Satisfaction Rating ── */
-    rateTicket: (state, action) => {
-      const { ticketId, rating } = action.payload;
-      state.ticketRatings[ticketId] = rating;
-    },
-
-    /* ── Customization & Atmosphere ── */
-    setThemeMode: (state, action) => { state.themeMode = action.payload; },
-    setColorTheme: (state, action) => { state.colorTheme = action.payload; },
-    setBackgroundEffect: (state, action) => { state.backgroundEffect = action.payload; },
-    setRadiusMode: (state, action) => { state.radiusMode = action.payload; },
-    setSoundEnabled: (state, action) => { state.soundEnabled = action.payload; },
-    setLanguage: (state, action) => { state.language = action.payload; },
-    setFontStyle: (state, action) => { state.fontStyle = action.payload; },
-    setFontSize: (state, action) => { state.fontSize = action.payload; },
-
-    /* ── Ticket Actions (Sync fallback) ── */
-    addTicket: (state, action) => { state.tickets.unshift(action.payload); },
-    addStudentTicket: (state, action) => { state.tickets.unshift(action.payload); },
-    resolveTicket: (state, action) => {
-      const t = state.tickets.find((t) => t.id === action.payload);
-      if (t) t.status = 'Resolved';
-    },
-    assignWorkerToTicket: (state, action) => {
-      const { ticketId, workerName } = action.payload;
-      const t = state.tickets.find((t) => t.id === ticketId);
-      if (t) { t.assignedWorker = workerName; t.status = 'In Progress'; }
-    },
-    updateTicketPriority: (state, action) => {
-      const { ticketId, priority } = action.payload;
-      const t = state.tickets.find(t => t.id === ticketId);
-      if (t) t.priority = priority;
-    },
-
-    /* ── Staff Request Actions ── */
-    approveStaffReq: (state, action) => {
-      const r = state.staffRequests.find((r) => r.id === action.payload);
-      if (r) r.status = 'Approved';
-    },
-    rejectStaffReq: (state, action) => {
-      const r = state.staffRequests.find((r) => r.id === action.payload);
-      if (r) r.status = 'Rejected';
-    },
-
-    /* ── Worker / Asset Actions ── */
-    markJobComplete: (state, action) => {
-      const t = state.tickets.find((t) => t.id === action.payload);
-      if (t) t.status = 'Resolved';
-    },
-    updateAssetCondition: (state, action) => {
-      const { tag, condition } = action.payload;
-      const a = state.assets.find((a) => a.tag === tag);
-      if (a) a.condition = condition;
-    },
-    addAssetMaintenanceRecord: (state, action) => {
-      const { tag, record } = action.payload;
-      const a = state.assets.find(a => a.tag === tag);
-      if (a) { if (!a.maintenanceHistory) a.maintenanceHistory = []; a.maintenanceHistory.unshift(record); }
-    },
-    addAsset: (state, action) => {
-      state.assets.unshift(action.payload);
-    },
-    updateAsset: (state, action) => {
-      const index = state.assets.findIndex(a => a.tag === action.payload.tag);
-      if (index !== -1) state.assets[index] = { ...state.assets[index], ...action.payload };
-    },
-    retireAsset: (state, action) => {
-      const a = state.assets.find(a => a.tag === action.payload);
-      if (a) {
-        a.status = 'Retired';
-        a.condition = 'Damaged';
-      }
-    },
-    transferAsset: (state, action) => {
-      const { tag, toBlock, toRoom, transferredBy, reason, date } = action.payload;
-      const a = state.assets.find(a => a.tag === tag);
-      const from = a ? a.location : 'Unknown';
-      if (a) {
-        a.block = toBlock;
-        a.room = toRoom;
-        a.location = `${toBlock} - Room ${toRoom}`;
-      }
-      state.transfers.unshift({
-        id: `TR-${Date.now()}`,
-        assetTag: tag,
-        assetName: a ? a.name : tag,
-        from,
-        to: `${toBlock} - Room ${toRoom}`,
-        transferredBy: transferredBy || 'Warden',
-        reason: reason || 'Room rearrangement',
-        date: date || new Date().toISOString().split('T')[0],
+      state.toasts.push({
+        id: action.payload.id || `t-${Date.now()}-${Math.random()}`,
+        message: action.payload.message,
+        type: action.payload.type || 'info', // 'success' | 'warn' | 'error' | 'info'
       });
     },
-    recordAudit: (state, action) => {
-      state.audits.unshift(action.payload);
-      if (action.payload.missingTags && action.payload.missingTags.length) {
-        state.assets.forEach(a => {
-          if (action.payload.missingTags.includes(a.tag)) {
-            a.status = 'Missing';
-          }
-        });
+    removeToast: (state, action) => {
+      state.toasts = state.toasts.filter((t) => t.id !== action.payload);
+    },
+    setRadiusMode: (state, action) => {
+      state.radiusMode = action.payload;
+    },
+    setLayoutMode: (state, action) => {
+      state.layoutMode = action.payload;
+    },
+    setLanguage: (state, action) => {
+      state.language = action.payload;
+    },
+    updateUserProfile: (state, action) => {
+      state.currentUser = { ...state.currentUser, ...action.payload };
+      if (state.authToken) {
+        saveSession({ user: state.currentUser, token: state.authToken, remember: state.rememberMe });
       }
     },
-    submitHandover: (state, action) => {
-      state.handovers.unshift(action.payload);
-    },
-    clearHandover: (state, action) => {
-      const h = state.handovers.find(h => h.handoverId === action.payload.handoverId);
-      if (h) {
-        h.status = action.payload.status || 'Cleared';
-        h.clearedBy = action.payload.clearedBy || 'Dr. Meena Sharma';
-        h.penaltyAmount = action.payload.penaltyAmount || 0;
-      }
-    },
-
-    /* ── Notification Actions ── */
     markNotificationRead: (state, action) => {
-      const n = state.notifications.find((n) => n.id === action.payload);
-      if (n) n.isRead = true;
+      const notif = state.notifications.find((n) => n.id === action.payload);
+      if (notif) {
+        notif.isRead = true;
+        notif.is_read = 1;
+      }
     },
     markAllNotificationsRead: (state) => {
-      state.notifications.forEach((n) => { n.isRead = true; });
+      state.notifications.forEach((n) => {
+        n.isRead = true;
+        n.is_read = 1;
+      });
     },
-    addNotification: (state, action) => { state.notifications.unshift(action.payload); },
-
-    /* ── Audit Log ── */
-    addAuditEntry: (state, action) => { state.auditLog.unshift(action.payload); },
   },
-
-  /* ── Extra Reducers for Async Thunk Backend Integration ── */
   extraReducers: (builder) => {
-    // 1. Initial Data Fetch
     builder
+      /* Initial Data Hydration */
       .addCase(fetchInitialData.pending, (state) => {
         state.isLoading = true;
-        state.apiError = null;
+        state.connectionError = null;
       })
       .addCase(fetchInitialData.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isBackendConnected = true;
-
-        const {
-          tickets,
-          staffRequests,
-          workers,
-          assets,
-          budget,
-          auditLog,
-          notifications,
-          ticketComments,
-          ticketRatings,
-          currentUser,
-          analytics,
-        } = action.payload;
-
-        if (tickets && tickets.length) state.tickets = tickets;
-        if (staffRequests && staffRequests.length) state.staffRequests = staffRequests;
-        if (workers && workers.length) state.workers = workers;
-        if (assets && assets.length) state.assets = assets;
-        if (budget) state.budget = budget;
-        if (auditLog && auditLog.length) state.auditLog = auditLog;
-        if (notifications && notifications.length) state.notifications = notifications;
-        if (ticketComments && Object.keys(ticketComments).length) state.ticketComments = ticketComments;
-        if (ticketRatings && Object.keys(ticketRatings).length) state.ticketRatings = ticketRatings;
-        if (currentUser) state.currentUser = { ...state.currentUser, ...currentUser };
-        if (analytics) {
-          if (analytics.ticketVolume7d) state.ticketVolume7d = analytics.ticketVolume7d;
-          if (analytics.ticketVolume30d) state.ticketVolume30d = analytics.ticketVolume30d;
-          if (analytics.budgetBurn7d) state.budgetBurn7d = analytics.budgetBurn7d;
-        }
+        state.dbStatus = action.payload.dbStatus || 'connected';
+        state.connectionError = null;
+        state.assets = action.payload.assets;
+        state.categories = action.payload.categories;
+        state.maintenanceTickets = action.payload.maintenanceTickets;
+        state.transfers = action.payload.transfers;
+        state.audits = action.payload.audits;
+        state.disposals = action.payload.disposals;
+        state.assetRequests = action.payload.assetRequests;
+        state.reportsSummary = action.payload.reportsSummary;
+        state.workers = action.payload.workers;
+        state.auditLogs = action.payload.auditLogs;
+        state.notifications = action.payload.notifications;
+        state.usersList = action.payload.usersList;
       })
       .addCase(fetchInitialData.rejected, (state, action) => {
         state.isLoading = false;
         state.isBackendConnected = false;
-        state.apiError = action.payload || 'Failed to connect to backend';
-      });
+        const errPayload = action.payload;
+        state.apiError = typeof errPayload === 'string' ? errPayload : errPayload?.message;
+        state.connectionError = errPayload?.message || 'Unable to connect to backend';
+        state.dbStatus = errPayload?.type === 'DATABASE_UNAVAILABLE' ? 'disconnected' : 'unknown';
+      })
 
-    // 2. Create Ticket
-    builder.addCase(createTicketAsync.fulfilled, (state, action) => {
-      const created = action.payload;
-      state.tickets.unshift(created);
-      state.auditLog.unshift({
-        id: `AL-${Date.now()}`,
-        action: 'Ticket Created',
-        actor: `${created.student} (Student)`,
-        target: created.id,
-        timestamp: new Date().toLocaleString(),
-        category: 'Ticket',
-      });
-      state.notifications.unshift({
-        id: `N-${Date.now()}`,
-        message: `New complaint ${created.id} logged in ${created.room} (${created.category})`,
-        type: 'info',
-        isRead: false,
-        time: 'Just now',
-      });
-    });
+      /* Create Asset */
+      .addCase(createAssetAsync.fulfilled, (state, action) => {
+        state.assets.unshift(action.payload);
+      })
 
-    // 3. Resolve Ticket
-    builder.addCase(resolveTicketAsync.fulfilled, (state, action) => {
-      const { ticketId, notes, actor } = action.payload;
-      const t = state.tickets.find((tk) => tk.id === ticketId);
-      if (t) t.status = 'Resolved';
-      if (notes) {
-        if (!state.ticketComments[ticketId]) state.ticketComments[ticketId] = [];
-        state.ticketComments[ticketId].push({
-          id: `C${Date.now()}`,
-          author: actor || 'User',
-          role: (actor && actor.includes('Tech')) ? 'Technician' : 'Student',
-          text: notes,
-          time: 'Just now',
+      /* Update Asset */
+      .addCase(updateAssetAsync.fulfilled, (state, action) => {
+        const idx = state.assets.findIndex((a) => a.tag === action.payload.tag);
+        if (idx !== -1) {
+          state.assets[idx] = { ...state.assets[idx], ...action.payload.updated };
+        }
+      })
+
+      /* Delete Asset */
+      .addCase(deleteAssetAsync.fulfilled, (state, action) => {
+        state.assets = state.assets.filter((a) => a.tag !== action.payload);
+      })
+
+      /* Create Category */
+      .addCase(createCategoryAsync.fulfilled, (state, action) => {
+        state.categories.push(action.payload);
+      })
+
+      /* Allocate Asset */
+      .addCase(allocateAssetAsync.fulfilled, (state, action) => {
+        const updated = action.payload.asset;
+        if (updated) {
+          const idx = state.assets.findIndex((a) => a.tag === updated.tag);
+          if (idx !== -1) state.assets[idx] = updated;
+        }
+      })
+
+      /* Return Asset */
+      .addCase(returnAssetAsync.fulfilled, (state, action) => {
+        const updated = action.payload.asset;
+        if (updated) {
+          const idx = state.assets.findIndex((a) => a.tag === updated.tag);
+          if (idx !== -1) state.assets[idx] = updated;
+        }
+      })
+
+      /* Transfer Asset */
+      .addCase(transferAssetAsync.fulfilled, (state, action) => {
+        const updated = action.payload.asset;
+        if (updated) {
+          const idx = state.assets.findIndex((a) => a.tag === updated.tag);
+          if (idx !== -1) state.assets[idx] = updated;
+        }
+        if (action.payload.transfer) {
+          state.transfers.unshift(action.payload.transfer);
+        }
+      })
+
+      /* Report Maintenance */
+      .addCase(reportMaintenanceAsync.fulfilled, (state, action) => {
+        state.maintenanceTickets.unshift(action.payload);
+        const idx = state.assets.findIndex((a) => a.tag === action.payload.asset_tag);
+        if (idx !== -1) {
+          state.assets[idx].condition = 'Needs Repair';
+          state.assets[idx].status = 'Under Maintenance';
+        }
+      })
+
+      /* Update Maintenance */
+      .addCase(updateMaintenanceAsync.fulfilled, (state, action) => {
+        const updatedTicket = action.payload.ticket;
+        if (updatedTicket) {
+          const idx = state.maintenanceTickets.findIndex((m) => m.ticket_id === updatedTicket.ticket_id);
+          if (idx !== -1) state.maintenanceTickets[idx] = updatedTicket;
+        }
+        const updatedAsset = action.payload.asset;
+        if (updatedAsset) {
+          const idx = state.assets.findIndex((a) => a.tag === updatedAsset.tag);
+          if (idx !== -1) state.assets[idx] = updatedAsset;
+        }
+      })
+
+      /* Submit Audit */
+      .addCase(submitAuditAsync.fulfilled, (state, action) => {
+        state.audits.unshift(action.payload);
+      })
+
+      /* Submit Disposal */
+      .addCase(submitDisposalAsync.fulfilled, (state, action) => {
+        state.disposals.unshift(action.payload);
+        const idx = state.assets.findIndex((a) => a.tag === action.payload.asset_tag);
+        if (idx !== -1) {
+          state.assets[idx].status = 'Disposed';
+          state.assets[idx].condition = 'Beyond Repair';
+        }
+      })
+
+      /* Submit Request */
+      .addCase(submitAssetRequestAsync.fulfilled, (state, action) => {
+        state.assetRequests.unshift(action.payload);
+      })
+
+      /* Review Request */
+      .addCase(reviewAssetRequestAsync.fulfilled, (state, action) => {
+        const idx = state.assetRequests.findIndex((r) => r.request_id === action.payload.request_id);
+        if (idx !== -1) state.assetRequests[idx] = action.payload;
+      })
+
+      /* Notification Read Async */
+      .addCase(markNotificationReadAsync.fulfilled, (state, action) => {
+        const notif = state.notifications.find((n) => n.id === action.payload.id);
+        if (notif) {
+          notif.isRead = true;
+          notif.is_read = 1;
+        }
+      })
+      .addCase(markAllNotificationsReadAsync.fulfilled, (state) => {
+        state.notifications.forEach((n) => {
+          n.isRead = true;
+          n.is_read = 1;
         });
-      }
-      state.auditLog.unshift({
-        id: `AL-${Date.now()}`,
-        action: 'Ticket Resolved',
-        actor: actor || 'User',
-        target: ticketId,
-        timestamp: new Date().toLocaleString(),
-        category: 'Ticket',
-      });
-    });
+      })
 
-    // 4. Assign Worker
-    builder.addCase(assignWorkerAsync.fulfilled, (state, action) => {
-      const { ticketId, workerName } = action.payload;
-      const t = state.tickets.find((tk) => tk.id === ticketId);
-      if (t) {
-        t.assignedWorker = workerName;
-        t.status = 'In Progress';
-      }
-      const w = state.workers.find(worker => worker.name === workerName);
-      if (w) w.jobs += 1;
-      state.auditLog.unshift({
-        id: `AL-${Date.now()}`,
-        action: 'Worker Assigned',
-        actor: 'Dr. Meena Sharma (AW)',
-        target: ticketId,
-        timestamp: new Date().toLocaleString(),
-        category: 'Assignment',
-      });
-      state.notifications.unshift({
-        id: `N-${Date.now()}`,
-        message: `Ticket ${ticketId} has been assigned to ${workerName}`,
-        type: 'info',
-        isRead: false,
-        time: 'Just now',
-      });
-    });
+      /* Register User */
+      .addCase(registerUserAsync.fulfilled, (state, action) => {
+        state.usersList.push(action.payload);
+      })
 
-    // 5. Update Priority
-    builder.addCase(updateTicketPriorityAsync.fulfilled, (state, action) => {
-      const { ticketId, priority } = action.payload;
-      const t = state.tickets.find((tk) => tk.id === ticketId);
-      if (t) t.priority = priority;
-    });
-
-    // 6. Bulk Update Ticket Status
-    builder.addCase(bulkUpdateTicketStatusAsync.fulfilled, (state, action) => {
-      const { ids, status } = action.payload;
-      state.tickets.forEach((t) => {
-        if (ids.includes(t.id)) {
-          t.status = status;
+      /* Profile Update Async */
+      .addCase(updateProfileAsync.fulfilled, (state, action) => {
+        state.currentUser = { ...state.currentUser, ...action.payload };
+        if (state.authToken) {
+          saveSession({ user: state.currentUser, token: state.authToken, remember: state.rememberMe });
         }
       });
-    });
-
-    // 7. Add Comment
-    builder.addCase(addCommentAsync.fulfilled, (state, action) => {
-      const { ticketId, comment } = action.payload;
-      if (!state.ticketComments[ticketId]) state.ticketComments[ticketId] = [];
-      state.ticketComments[ticketId].push(comment);
-    });
-
-    // 8. Rate Ticket
-    builder.addCase(rateTicketAsync.fulfilled, (state, action) => {
-      const { ticketId, rating } = action.payload;
-      state.ticketRatings[ticketId] = rating;
-    });
-
-    // 9. Submit Staff Request
-    builder.addCase(submitStaffRequestAsync.fulfilled, (state, action) => {
-      const req = action.payload;
-      state.staffRequests.unshift(req);
-      state.auditLog.unshift({
-        id: `AL-${Date.now()}`,
-        action: 'Staff Request Submitted',
-        actor: `${req.submittedBy} (Staff)`,
-        target: req.id,
-        timestamp: new Date().toLocaleString(),
-        category: 'Request',
-      });
-      state.notifications.unshift({
-        id: `N-${Date.now()}`,
-        message: `New ${req.dept} request ${req.id} for ₹${req.cost.toLocaleString()} submitted`,
-        type: 'info',
-        isRead: false,
-        time: 'Just now',
-      });
-    });
-
-    // 10. Approve Staff Request
-    builder.addCase(approveStaffRequestAsync.fulfilled, (state, action) => {
-      const { id, cost } = action.payload;
-      const r = state.staffRequests.find((req) => req.id === id);
-      if (r) r.status = 'Approved';
-      if (cost || (r && r.cost)) {
-        const amount = cost || r.cost;
-        state.budget.spent += amount;
-        state.budget.pending = Math.max(0, state.budget.pending - amount);
-      }
-      state.auditLog.unshift({
-        id: `AL-${Date.now()}`,
-        action: 'Request Approved',
-        actor: 'Prof. R. Iyer (RW)',
-        target: id,
-        timestamp: new Date().toLocaleString(),
-        category: 'Approval',
-      });
-    });
-
-    // 11. Reject Staff Request
-    builder.addCase(rejectStaffRequestAsync.fulfilled, (state, action) => {
-      const { id } = action.payload;
-      const r = state.staffRequests.find((req) => req.id === id);
-      if (r) r.status = 'Rejected';
-      if (r) {
-        state.budget.pending = Math.max(0, state.budget.pending - r.cost);
-      }
-      state.auditLog.unshift({
-        id: `AL-${Date.now()}`,
-        action: 'Request Rejected',
-        actor: 'Prof. R. Iyer (RW)',
-        target: id,
-        timestamp: new Date().toLocaleString(),
-        category: 'Approval',
-      });
-    });
-
-    // 12. Bulk Approve Staff Requests
-    builder.addCase(bulkApproveStaffRequestsAsync.fulfilled, (state, action) => {
-      const { ids, totalCost } = action.payload;
-      state.staffRequests.forEach((r) => {
-        if (ids.includes(r.id)) {
-          r.status = 'Approved';
-        }
-      });
-      if (totalCost) {
-        state.budget.spent += totalCost;
-        state.budget.pending = Math.max(0, state.budget.pending - totalCost);
-      }
-    });
-
-    // 13. Update Asset Condition
-    builder.addCase(updateAssetConditionAsync.fulfilled, (state, action) => {
-      const { tag, condition } = action.payload;
-      const a = state.assets.find((ast) => ast.tag === tag);
-      if (a) a.condition = condition;
-      state.auditLog.unshift({
-        id: `AL-${Date.now()}`,
-        action: 'Asset Condition Updated',
-        actor: 'Dr. Meena Sharma (Asset Mgr)',
-        target: tag,
-        timestamp: new Date().toLocaleString(),
-        category: 'Asset',
-      });
-    });
-
-    // 14. Add Asset Maintenance Record
-    builder.addCase(addAssetMaintenanceRecordAsync.fulfilled, (state, action) => {
-      const { tag, record } = action.payload;
-      const a = state.assets.find((ast) => ast.tag === tag);
-      if (a) {
-        if (!a.maintenanceHistory) a.maintenanceHistory = [];
-        a.maintenanceHistory.unshift(record);
-      }
-    });
-
-    // 15. Toggle Worker Availability
-    builder.addCase(toggleWorkerAvailabilityAsync.fulfilled, (state, action) => {
-      const { id, availability } = action.payload;
-      const w = state.workers.find((wkr) => wkr.id === id || wkr.name === id);
-      if (w) w.availability = availability;
-    });
-
-    // 16. Notification Read Updates
-    builder.addCase(markNotificationReadAsync.fulfilled, (state, action) => {
-      const { id } = action.payload;
-      const n = state.notifications.find((notif) => notif.id === id);
-      if (n) n.isRead = true;
-    });
-
-    builder.addCase(markAllNotificationsReadAsync.fulfilled, (state) => {
-      state.notifications.forEach((n) => { n.isRead = true; });
-    });
-
-    // 17. Add Audit Entry
-    builder.addCase(addAuditEntryAsync.fulfilled, (state, action) => {
-      state.auditLog.unshift(action.payload);
-    });
-
-    // 18. Create Asset
-    builder.addCase(createAssetAsync.fulfilled, (state, action) => {
-      if (action.payload) state.assets.unshift(action.payload);
-    });
-
-    // 19. Transfer Asset
-    builder.addCase(transferAssetAsync.fulfilled, (state, action) => {
-      if (action.payload?.transfer) state.transfers.unshift(action.payload.transfer);
-      if (action.payload?.asset) {
-        const idx = state.assets.findIndex(a => a.tag === action.payload.asset.tag);
-        if (idx !== -1) state.assets[idx] = { ...state.assets[idx], ...action.payload.asset };
-      }
-    });
-
-    // 20. Record Audit
-    builder.addCase(recordAuditAsync.fulfilled, (state, action) => {
-      if (action.payload) state.audits.unshift(action.payload);
-    });
-
-    // 21. Submit Handover
-    builder.addCase(submitHandoverAsync.fulfilled, (state, action) => {
-      if (action.payload) state.handovers.unshift(action.payload);
-    });
-
-    // 22. Clear Handover
-    builder.addCase(clearHandoverAsync.fulfilled, (state, action) => {
-      if (action.payload) {
-        const idx = state.handovers.findIndex(h => h.handover_id === action.payload.handover_id || h.handoverId === action.payload.handover_id);
-        if (idx !== -1) state.handovers[idx] = { ...state.handovers[idx], ...action.payload };
-      }
-    });
-
-    // 23. Retire Asset
-    builder.addCase(retireAssetAsync.fulfilled, (state, action) => {
-      const a = state.assets.find(ast => ast.tag === action.payload.tag);
-      if (a) {
-        a.status = 'Retired';
-        a.condition = 'Damaged';
-      }
-    });
   },
 });
 
 export const {
-  setRole, setPage, setViewMode, setLayoutMode, selectTicket,
-  openTicketDrawer, closeTicketDrawer,
-  setAiDrawerOpen, setFloorplanModalOpen, setProfileModalOpen, setSelectedRoomId, updateRoomAssetStatus,
+  loginSuccess,
+  logout,
+  setConnectionStatus,
+  setRole,
+  setAdminType,
+  setCurrentUser,
+  setActiveTab,
+  setViewMode,
+  setThemeMode,
+  setColorTheme,
+  setRadiusMode,
+  setLayoutMode,
+  setLanguage,
   updateUserProfile,
-  addToast, removeToast,
-  addComment, rateTicket,
-  setThemeMode, setColorTheme, setBackgroundEffect, setRadiusMode, setSoundEnabled, setLanguage, setFontStyle, setFontSize,
-  addTicket, addStudentTicket, resolveTicket, assignWorkerToTicket, updateTicketPriority,
-  approveStaffReq, rejectStaffReq,
-  markJobComplete, updateAssetCondition, addAssetMaintenanceRecord,
-  addAsset, updateAsset, retireAsset, transferAsset, recordAudit, submitHandover, clearHandover,
-  markNotificationRead, markAllNotificationsRead, addNotification,
-  addAuditEntry,
+  setFontStyle,
+  setFontSize,
+  setSelectedAssetTag,
+  setQrPreviewTag,
+  setSearchQuery,
+  setCategoryFilter,
+  setConditionFilter,
+  setStatusFilter,
+  setBlockFilter,
+  setQrScannerModalOpen,
+  setNewAssetModalOpen,
+  setAllocateModalOpen,
+  setTransferModalOpen,
+  setReturnModalOpen,
+  setMaintenanceModalOpen,
+  setDisposalModalOpen,
+  setAuditModalOpen,
+  setRequestAssetModalOpen,
+  setProfileModalOpen,
+  setSettingsModalOpen,
+  addToast,
+  removeToast,
+  markNotificationRead,
+  markAllNotificationsRead,
 } = ticketSlice.actions;
 
 export default ticketSlice.reducer;

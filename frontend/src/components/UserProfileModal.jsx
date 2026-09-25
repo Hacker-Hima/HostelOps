@@ -1,6 +1,6 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setProfileModalOpen, updateUserProfile, setRole, addToast } from '../redux/ticketSlice';
+import { setProfileModalOpen, updateUserProfile, updateProfileAsync, logout, addToast } from '../redux/ticketSlice';
 import { useTranslation } from '../utils/translations';
 
 const ROLE_META = {
@@ -93,24 +93,39 @@ export default function UserProfileModal() {
     }
   }, [currentUser, profileModalOpen]);
 
+  const [isSaving, setIsSaving] = useState(false);
+
   if (!profileModalOpen) return null;
 
   const meta = ROLE_META[currentRole] || ROLE_META.student;
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    dispatch(updateUserProfile(formData));
-    dispatch(addToast({
-      id: `profile-saved-${Date.now()}`,
-      message: 'Profile details saved successfully!',
-      type: 'success',
-    }));
-    setIsEditing(false);
+    setIsSaving(true);
+    try {
+      await dispatch(updateProfileAsync(formData)).unwrap();
+      dispatch(addToast({
+        id: `profile-saved-${Date.now()}`,
+        message: 'Profile details saved successfully!',
+        type: 'success',
+      }));
+      setIsEditing(false);
+    } catch (err) {
+      dispatch(updateUserProfile(formData));
+      dispatch(addToast({
+        id: `profile-saved-${Date.now()}`,
+        message: 'Profile saved locally: ' + (err.message || err),
+        type: 'warn',
+      }));
+      setIsEditing(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSignOut = () => {
     dispatch(setProfileModalOpen(false));
-    dispatch(setRole('login'));
+    dispatch(logout());
     dispatch(addToast({
       id: `logout-${Date.now()}`,
       message: 'Signed out of workspace',

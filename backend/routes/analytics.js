@@ -1,90 +1,177 @@
 import express from 'express';
-import { Ticket, Asset, StaffRequest } from '../models/index.js';
+import {
+  Asset,
+  AssetMaintenance,
+  AssetRequest,
+  AssetAudit,
+  AssetDisposal,
+  AssetCategory,
+} from '../models/index.js';
 
 const router = express.Router();
 
-// GET /api/analytics/overview — Comprehensive analytics data for Warden, Res. Warden, and Principal views
-router.get('/overview', async (req, res) => {
+/**
+ * Utility: Calculate depreciation
+ */
+function calculateDepreciation(purchaseCost = 0, purchaseDate = '2024-01-01', rate = 10) {
   try {
-    const totalTickets = await Ticket.countDocuments();
-    const resolvedTickets = await Ticket.countDocuments({ status: 'Resolved' });
-    const pendingTickets = await Ticket.countDocuments({ status: 'Pending' });
-    const inProgressTickets = await Ticket.countDocuments({ status: 'In Progress' });
-    const unassignedTickets = await Ticket.countDocuments({ assigned_worker: 'Unassigned' });
+    const cost = Number(purchaseCost) || 0;
+    const depRate = Number(rate) || 10;
+    const pDate = new Date(purchaseDate);
+    const validDate = isNaN(pDate.getTime()) ? new Date('2024-01-01') : pDate;
+    const msElapsed = Math.max(0, Date.now() - validDate.getTime());
+    const yearsElapsed = msElapsed / (365.25 * 24 * 60 * 60 * 1000);
+    const totalDepreciation = cost * (depRate / 100) * yearsElapsed;
+    return Math.max(Math.round(cost * 0.05), Math.round(cost - totalDepreciation));
+  } catch {
+    return Number(purchaseCost) || 0;
+  }
+}
 
-    const totalAssets = await Asset.countDocuments();
+// GET /api/analytics or /api/analytics/overview — Live analytics aggregated from MongoDB
+router.get(['/', '/overview'], async (req, res) => {
+  try {
+    // 1. Assets KPIs
+    const allAssets = await Asset.find().lean();
+    const totalAssets = allAssets.length;
+    const assignedAssets = allAssets.filter((a) => a.status === 'Assigned').length;
+    const availableAssets = allAssets.filter((a) => a.status === 'In Store' || a.status === 'Available').length;
+    const underMaintenanceAssets = allAssets.filter((a) => a.status === 'Under Maintenance').length;
+    const missingAssets = allAssets.filter((a) => a.status === 'Missing').length;
+    const disposedAssets = allAssets.filter((a) => a.status === 'Disposed').length;
 
-    // Pending requests aggregate
-    const pendingReqsResult = await StaffRequest.aggregate([
-      { $match: { status: { $regex: /^Pending/i } } },
-      {
-        $group: {
-          _id: null,
-          count: { $sum: 1 },
-          totalCost: { $sum: '$cost' },
-        },
-      },
-    ]);
+    // 2. Asset Valuations & Depreciation
+    const totalPurchaseValuation = allAssets.reduce((sum, a) => sum + (a.purchase_cost || a.value || 0), 0);
+    const currentDepreciatedValuation = allAssets.reduce((sum, a) => {
+      if (a.status === 'Disposed') return sum;
+      const pCost = a.purchase_cost || a.value || 0;
+      return sum + (a.current_value || calculateDepreciation(pCost, a.purchase_date, a.depreciation_rate));
+    }, 0);
+    const totalDepreciation = Math.max(0, totalPurchaseValuation - currentDepreciatedValuation);
 
-    const pendingRequestsCount = pendingReqsResult[0]?.count || 0;
-    const pendingRequestsCost = pendingReqsResult[0]?.totalCost || 0;
+    // 3. Maintenance Aggregates
+    const maintenanceTickets = await AssetMaintenance.find().lean();
+    const totalMaintenanceCount = maintenanceTickets.length;
+    const pendingMaintenanceCount = maintenanceTickets.filter((m) => m.status === 'Reported' || m.status === 'Assigned' || m.status === 'In Progress').length;
+    const resolvedMaintenanceCount = maintenanceTickets.filter((m) => m.status === 'Repaired').length;
+    const totalMaintenanceSpent = maintenanceTickets.reduce((sum, m) => sum + (m.repair_cost || 0), 0);
 
-    // Category breakdown
-    const catRows = await Ticket.aggregate([
-      { $group: { _id: '$category', count: { $sum: 1 } } },
-    ]);
-    const categories = {};
-    for (const r of catRows) {
-      if (r._id) {
-        categories[r._id] = r.count;
-      }
-    }
+    // 4. Student Asset Requests
+    const allRequests = await AssetRequest.find().lean();
+    const pendingRequestsCount = allRequests.filter((r) => r.status === 'Pending').length;
+    const approvedRequestsCount = allRequests.filter((r) => r.status === 'Approved' || r.status === 'Allocated').length;
 
-    // Condition breakdown for assets
-    const condRows = await Asset.aggregate([
-      { $group: { _id: '$condition', count: { $sum: 1 } } },
-    ]);
-    const conditions = { Good: 0, 'Needs Repair': 0, Damaged: 0, 'Under Maintenance': 0 };
-    for (const r of condRows) {
-      if (r._id && conditions[r._id] !== undefined) {
-        conditions[r._id] = r.count;
-      }
-    }
+    // 5. Asset Condition Breakdown
+    const conditions = {
+      Good: allAssets.filter((a) => a.condition === 'Good').length,
+      'Needs Repair': allAssets.filter((a) => a.condition === 'Needs Repair').length,
+      Damaged: allAssets.filter((a) => a.condition === 'Damaged').length,
+      'Under Maintenance': allAssets.filter((a) => a.condition === 'Under Maintenance').length,
+      'Beyond Repair': allAssets.filter((a) => a.condition === 'Beyond Repair').length,
+    };
 
-    // Dynamic block breakdown
-    const ticketsAll = await Ticket.find({}, 'room').lean();
-    const blockCount = { 'Block A': 0, 'Block B': 0, 'Block C': 0, 'Block D': 0 };
-    for (const t of ticketsAll) {
-      const room = t.room || '';
-      if (room.startsWith('A-') || room.startsWith('A')) blockCount['Block A']++;
-      else if (room.startsWith('B-') || room.startsWith('B')) blockCount['Block B']++;
-      else if (room.startsWith('C-') || room.startsWith('C')) blockCount['Block C']++;
-      else if (room.startsWith('D-') || room.startsWith('D')) blockCount['Block D']++;
-    }
+    // 6. Category Distribution (Live from DB)
+    const categoriesMap = {};
+    allAssets.forEach((a) => {
+      const cat = a.category || 'Uncategorized';
+      categoriesMap[cat] = (categoriesMap[cat] || 0) + 1;
+    });
+
+    const categoryBreakdown = Object.entries(categoriesMap).map(([name, count]) => ({
+      category: name,
+      name,
+      count,
+      pct: totalAssets > 0 ? Math.round((count / totalAssets) * 100) : 0,
+    }));
+
+    // 7. Dynamic Block Distribution (Live from DB)
+    const blockCounts = {};
+    allAssets.forEach((a) => {
+      const b = a.block || 'Admin Block';
+      blockCounts[b] = (blockCounts[b] || 0) + 1;
+    });
+
+    const blockColors = {
+      'Block A': '#7c3aed',
+      'Block B': '#06b6d4',
+      'Block C': '#10b981',
+      'Block D': '#ec4899',
+      'Admin Block': '#f59e0b',
+      'Service Block': '#6366f1',
+    };
+
+    const blockDistribution = Object.entries(blockCounts).map(([name, count]) => {
+      const pct = totalAssets > 0 ? Math.round((count / totalAssets) * 100) : 0;
+      return {
+        name,
+        count,
+        pct,
+        color: blockColors[name] || '#3b82f6',
+      };
+    });
+
+    // 8. Audits summary
+    const allAudits = await AssetAudit.find().lean();
+    const totalAuditsCompleted = allAudits.length;
+    const auditsWithDiscrepancies = allAudits.filter((a) => a.missing_count > 0).length;
+
+    // 9. Disposals summary
+    const allDisposals = await AssetDisposal.find().lean();
+    const totalSalvageRecovered = allDisposals.reduce((sum, d) => sum + (d.salvage_value || 0), 0);
 
     res.json({
-      totalTickets,
-      resolvedTickets,
-      pendingTickets,
-      inProgressTickets,
-      unassignedTickets,
+      success: true,
+      // Core Asset KPIs
       totalAssets,
+      assignedAssets,
+      availableAssets,
+      underMaintenanceAssets,
+      missingAssets,
+      disposedAssets,
+
+      // Financials
+      totalPurchaseValuation,
+      currentDepreciatedValuation,
+      totalDepreciation,
+      totalMaintenanceSpent,
+      totalSalvageRecovered,
+
+      // Operational Status
+      totalMaintenanceCount,
+      pendingMaintenanceCount,
+      resolvedMaintenanceCount,
       pendingRequestsCount,
-      pendingRequestsCost,
-      categories,
+      approvedRequestsCount,
+
+      // Distributions
       conditions,
-      blockDistribution: [
-        { name: 'Block A', count: blockCount['Block A'] + 38, pct: 85, color: '#7c3aed' },
-        { name: 'Block B', count: blockCount['Block B'] + 36, pct: 75, color: '#06b6d4' },
-        { name: 'Block C', count: blockCount['Block C'] + 26, pct: 55, color: '#10b981' },
-        { name: 'Block D', count: blockCount['Block D'] + 19, pct: 40, color: '#ec4899' },
-      ],
-      ticketVolume7d: [3, 5, 2, 8, 4, 6, 7],
-      ticketVolume30d: [12, 9, 15, 8, 11, 14, 10, 7, 9, 13, 11, 8, 6, 10, 12, 15, 9, 8, 11, 14, 10, 7, 9, 13, 11, 8, 6, 10, 12, 15],
-      budgetBurn7d: [310000, 318000, 322000, 328000, 332000, 337000, 340000],
+      categories: categoriesMap,
+      categoryBreakdown,
+      blockDistribution,
+      blockBreakdown: blockDistribution,
+
+      // Nested metrics structure
+      metrics: {
+        totalAssets,
+        assignedAssets,
+        availableAssets,
+        underMaintenanceAssets,
+        missingAssets,
+        disposedAssets,
+        totalPurchaseValuation,
+        currentDepreciatedValuation,
+        totalDepreciation,
+        totalMaintenanceSpent,
+        totalSalvageRecovered,
+      },
+
+      // Audit Status
+      totalAuditsCompleted,
+      auditsWithDiscrepancies,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Analytics aggregation error:', err);
+    res.status(500).json({ success: false, message: 'Could not compute analytics overview.', error: err.message });
   }
 });
 

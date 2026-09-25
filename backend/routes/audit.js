@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'crypto';
 import { AuditLog } from '../models/index.js';
 
 const router = express.Router();
@@ -13,12 +14,12 @@ router.get('/', async (req, res) => {
       filter.category = category;
     }
 
-    let rows = await AuditLog.find(filter).sort({ _id: -1 }).lean();
+    let rows = await AuditLog.find(filter).sort({ createdAt: -1, _id: -1 }).lean();
 
     if (search && search.trim()) {
       const term = search.toLowerCase();
       rows = rows.filter(
-        l =>
+        (l) =>
           l.action.toLowerCase().includes(term) ||
           l.actor.toLowerCase().includes(term) ||
           l.target.toLowerCase().includes(term)
@@ -26,7 +27,7 @@ router.get('/', async (req, res) => {
     }
 
     res.json(
-      rows.map(l => ({
+      rows.map((l) => ({
         id: l.id,
         action: l.action,
         actor: l.actor,
@@ -36,7 +37,7 @@ router.get('/', async (req, res) => {
       }))
     );
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -52,10 +53,10 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     if (!action || !actor || !target) {
-      return res.status(400).json({ error: 'action, actor, and target are required' });
+      return res.status(400).json({ success: false, message: 'Action, actor, and target are required fields.' });
     }
 
-    const id = req.body.id || `AL-${Date.now()}`;
+    const id = req.body.id || `AL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     const created = await AuditLog.create({
       id,
       action,
@@ -74,7 +75,7 @@ router.post('/', async (req, res) => {
       category: created.category,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

@@ -1,8 +1,9 @@
 import { configureStore } from '@reduxjs/toolkit';
-import ticketReducer from './ticketSlice';
+import assetOpsReducer from './ticketSlice';
 
 export const store = configureStore({
   reducer: {
-    ticketStore: ticketReducer,
+    ticketStore: assetOpsReducer,
+    assetOps: assetOpsReducer,
   },
 });

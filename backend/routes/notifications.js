@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'crypto';
 import { Notification } from '../models/index.js';
 
 const router = express.Router();
@@ -9,18 +10,19 @@ function mapNotif(doc) {
     id: doc.id,
     message: doc.message,
     type: doc.type,
-    isRead: Boolean(doc.is_read ?? doc.isRead),
-    time: doc.time,
+    isRead: Boolean(doc.is_read || doc.isRead),
+    time: doc.time || 'Recently',
+    createdAt: doc.createdAt,
   };
 }
 
 // GET /api/notifications — Fetch all notifications
 router.get('/', async (req, res) => {
   try {
-    const rows = await Notification.find().sort({ _id: -1 }).lean();
+    const rows = await Notification.find().sort({ createdAt: -1 }).lean();
     res.json(rows.map(mapNotif));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -35,12 +37,12 @@ router.patch('/:id/read', async (req, res) => {
     ).lean();
 
     if (!updated) {
-      return res.status(404).json({ error: 'Notification not found' });
+      return res.status(404).json({ success: false, message: 'Notification not found' });
     }
 
     res.json(mapNotif(updated));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -48,10 +50,10 @@ router.patch('/:id/read', async (req, res) => {
 router.patch('/read-all', async (req, res) => {
   try {
     await Notification.updateMany({}, { is_read: 1 });
-    const rows = await Notification.find().sort({ _id: -1 }).lean();
+    const rows = await Notification.find().sort({ createdAt: -1 }).lean();
     res.json(rows.map(mapNotif));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -60,9 +62,9 @@ router.post('/', async (req, res) => {
   try {
     const { message, type = 'info', time = 'Just now' } = req.body;
     if (!message) {
-      return res.status(400).json({ error: 'message is required' });
+      return res.status(400).json({ success: false, message: 'Notification message is required' });
     }
-    const id = req.body.id || `N-${Date.now()}`;
+    const id = req.body.id || `N-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     const created = await Notification.create({
       id,
       message,
@@ -73,7 +75,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(mapNotif(created));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

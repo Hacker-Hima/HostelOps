@@ -4,7 +4,7 @@ import {
   setThemeMode, setColorTheme, setRadiusMode,
   setLayoutMode, setLanguage, setViewMode,
   setFontStyle, setFontSize,
-  setRole, addToast, updateUserProfile,
+  logout, setRole, addToast, updateUserProfile,
 } from '../redux/ticketSlice';
 import { useTranslation } from '../utils/translations';
 
@@ -75,8 +75,8 @@ export default function SettingsModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const handleReset = () => {
-    dispatch(setThemeMode('dark'));
-    dispatch(setColorTheme('purple'));
+    dispatch(setThemeMode('light'));
+    dispatch(setColorTheme('cyan'));
     dispatch(setRadiusMode('smooth'));
     dispatch(setFontStyle('inter'));
     dispatch(setFontSize('normal'));
@@ -85,7 +85,7 @@ export default function SettingsModal({ isOpen, onClose }) {
   };
 
   const handleSignOut = () => {
-    dispatch(setRole('login'));
+    dispatch(logout());
     onClose();
     dispatch(addToast({ id: `toast-so-${Date.now()}`, message: 'Signed out successfully', type: 'success' }));
   };
@@ -225,20 +225,6 @@ export default function SettingsModal({ isOpen, onClose }) {
                           <div style={{ width:32, height:20, margin:'0 auto 8px', background:'var(--accent-primary-soft)',
                             border:'1.5px solid var(--accent-primary)', borderRadius:r.r }} />
                           <div style={{ fontSize:11.5, fontWeight:700, color:'var(--text-primary)' }}>{r.label}</div>
-                        </div>
-                      </OptionCard>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <SectionLabel>Default Viewport</SectionLabel>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    {[{ id:'desktop', icon:'🖥️', label:'Desktop' }, { id:'mobile', icon:'📱', label:'Mobile' }].map((v) => (
-                      <OptionCard key={v.id} selected={viewMode === v.id} onClick={() => dispatch(setViewMode(v.id))}>
-                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                          <span style={{ fontSize:18 }}>{v.icon}</span>
-                          <span style={{ fontSize:12.5, fontWeight:600, color:'var(--text-primary)' }}>{v.label} View</span>
                         </div>
                       </OptionCard>
                     ))}

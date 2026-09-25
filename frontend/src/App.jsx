@@ -2,94 +2,86 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   setRole,
+  logout,
   setViewMode,
+  setThemeMode,
   fetchInitialData,
   markAllNotificationsRead,
   markNotificationRead,
-  setAiDrawerOpen,
-  setFloorplanModalOpen,
-  setProfileModalOpen,
+  markAllNotificationsReadAsync,
+  markNotificationReadAsync,
+  setSettingsModalOpen,
+  addToast,
 } from './redux/ticketSlice';
-import { useTranslation } from './utils/translations';
 
 /* ── Role Views ── */
-import LoginPage      from './components/LoginPage';
-import StudentView    from './components/StudentView';
-import WardenView     from './components/WardenView';
-import ResWardenView  from './components/ResWardenView';
-import TechnicianView from './components/TechnicianView';
-import AssetView      from './components/AssetView';
-import PrincipalView  from './components/PrincipalView';
+import LoginPage from './components/LoginPage';
+import AdminDashboard from './components/AdminDashboard';
+import StudentDashboard from './components/StudentDashboard';
 
-/* ── Settings & Global Overlays ── */
-import SettingsModal          from './components/SettingsModal';
-import ToastHost              from './components/ToastHost';
-import CommandPalette         from './components/CommandPalette';
-import TicketDrawer           from './components/TicketDrawer';
-import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
-import HostelBotAI            from './components/HostelBotAI';
-import HostelFloorplan        from './components/HostelFloorplan';
-import UserProfileModal       from './components/UserProfileModal';
-import AestheticLoader        from './components/AestheticLoader';
+/* ── Lifecycle Modals & Global Overlays ── */
+import AddAssetModal from './components/AddAssetModal';
+import AllocateAssetModal from './components/AllocateAssetModal';
+import TransferAssetModal from './components/TransferAssetModal';
+import ReturnAssetModal from './components/ReturnAssetModal';
+import MaintenanceModal from './components/MaintenanceModal';
+import AuditModal from './components/AuditModal';
+import DisposalModal from './components/DisposalModal';
+import RequestAssetModal from './components/RequestAssetModal';
+import QrPreviewModal from './components/QrPreviewModal';
+import QrScannerModal from './components/QrScannerModal';
+import SettingsModal from './components/SettingsModal';
+import ToastHost from './components/ToastHost';
 
 import './index.css';
 
-const ROLE_CONFIG = [
-  { id: 'login',       key: 'role_login',        defaultLabel: 'Login',        icon: '🔐', color: '#7c3aed' },
-  { id: 'student',     key: 'role_student',      defaultLabel: 'Student',      icon: '🎓', color: '#06b6d4' },
-  { id: 'asst-warden', key: 'role_asst_warden',  defaultLabel: 'Asst. Warden', icon: '🏫', color: '#8b5cf6' },
-  { id: 'res-warden',  key: 'role_res_warden',   defaultLabel: 'Res. Warden',  icon: '🏛️', color: '#ec4899' },
-  { id: 'technician',  key: 'role_technician',   defaultLabel: 'Technician',   icon: '⚡', color: '#f59e0b' },
-  { id: 'assets',      key: 'role_assets',       defaultLabel: 'Assets',       icon: '📦', color: '#10b981' },
-  { id: 'principal',   key: 'role_principal',    defaultLabel: 'Principal',    icon: '👑', color: '#ef4444' },
-];
-
-const COLOR_GRADS = {
-  purple: 'linear-gradient(135deg,#7c3aed,#06b6d4)',
-  cyan:   'linear-gradient(135deg,#06b6d4,#3b82f6)',
-  green:  'linear-gradient(135deg,#10b981,#06b6d4)',
-  orange: 'linear-gradient(135deg,#f97316,#eab308)',
-  red:    'linear-gradient(135deg,#ef4444,#ec4899)',
-  pink:   'linear-gradient(135deg,#ec4899,#8b5cf6)',
-  cyber:  'linear-gradient(135deg,#00ffc8,#7928ca)',
-  gold:   'linear-gradient(135deg,#f59e0b,#fbbf24)',
-  frost:  'linear-gradient(135deg,#38bdf8,#818cf8)',
-};
-
 export default function App() {
-  const dispatch  = useDispatch();
+  const dispatch = useDispatch();
   const {
-    isLoading,
     currentRole,
-    currentPage,
+    adminType,
     currentUser,
     viewMode,
     themeMode,
     colorTheme,
     notifications,
-    aiDrawerOpen,
-    floorplanModalOpen,
     fontStyle,
     fontSize,
+    isBackendConnected,
+    dbStatus,
+    connectionError,
   } = useSelector((s) => s.ticketStore);
-  const { t } = useTranslation();
 
-  const [showSettings,  setShowSettings]  = useState(false);
-  const [showNotifs,    setShowNotifs]    = useState(false);
-  const [showCmd,       setShowCmd]       = useState(false);
-  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.isRead && !n.is_read).length;
 
-  /* Fetch initial full-stack data from backend on mount */
+  /* Listen for session expired events from API client */
+  useEffect(() => {
+    const handleSessionExpired = (e) => {
+      dispatch(logout());
+      dispatch(
+        addToast({
+          id: `sess-exp-${Date.now()}`,
+          message: e.detail?.message || 'Session expired. Please log in again.',
+          type: 'warn',
+        })
+      );
+    };
+    window.addEventListener('hostelops:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('hostelops:session-expired', handleSessionExpired);
+  }, [dispatch]);
+
+  /* Fetch initial full-stack data from MongoDB Backend */
   useEffect(() => {
     dispatch(fetchInitialData())
       .unwrap()
       .then(() => {
-        console.log('✅ Connected to HostelOps MongoDB Backend');
+        console.log('✅ Connected to MongoDB Backend');
       })
       .catch((err) => {
-        console.warn('⚠️ Running in offline/fallback mode:', err);
+        console.warn('⚠️ Backend connection notice:', err);
       });
   }, [dispatch]);
 
@@ -100,179 +92,185 @@ export default function App() {
   }, [themeMode]);
 
   useEffect(() => {
-    const allThemes = ['purple','cyan','green','orange','red','pink','cyber','gold','frost'];
+    const allThemes = ['purple', 'cyan', 'green', 'orange', 'red', 'pink', 'cyber', 'gold', 'frost'];
     allThemes.forEach((th) => document.body.classList.remove(`color-${th}`));
     document.body.classList.add(`color-${colorTheme}`);
   }, [colorTheme]);
 
   useEffect(() => {
-    const fonts = ['inter','dm-sans','outfit','nunito'];
+    const fonts = ['inter', 'dm-sans', 'outfit', 'nunito'];
     fonts.forEach((f) => document.body.classList.remove(`font-${f}`));
     document.body.classList.add(`font-${fontStyle || 'inter'}`);
   }, [fontStyle]);
 
   useEffect(() => {
-    const sizes = ['compact','normal','comfortable','large'];
+    const sizes = ['compact', 'normal', 'comfortable', 'large'];
     sizes.forEach((s) => document.body.classList.remove(`size-${s}`));
     document.body.classList.add(`size-${fontSize || 'normal'}`);
   }, [fontSize]);
 
-  /* Global Keyboard Shortcuts */
-  useEffect(() => {
-    const handler = (e) => {
-      // Ctrl+K / Cmd+K
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        setShowCmd((p) => !p);
-      }
-      // ? (when not typing in an input/textarea)
-      if (e.key === '?' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
-        e.preventDefault();
-        setShowShortcuts((p) => !p);
-      }
-      // Escape closes panels
-      if (e.key === 'Escape') {
-        setShowSettings(false);
-        setShowCmd(false);
-        setShowShortcuts(false);
-        setShowNotifs(false);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
-
-  /* Close notifs on outside click */
-  useEffect(() => {
-    if (!showNotifs) return;
-    const handler = () => setShowNotifs(false);
-    setTimeout(() => document.addEventListener('click', handler), 0);
-    return () => document.removeEventListener('click', handler);
-  }, [showNotifs]);
-
   const handleRoleSwitch = useCallback((id) => dispatch(setRole(id)), [dispatch]);
-  const handleViewMode   = useCallback((m)  => dispatch(setViewMode(m)), [dispatch]);
 
   const ActiveView = useMemo(() => {
-    const isMobile = viewMode === 'mobile';
     switch (currentRole) {
-      case 'login':       return <LoginPage />;
-      case 'student':     return <StudentView     page={currentPage} isMobile={isMobile} />;
-      case 'asst-warden': return <WardenView      page={currentPage} isMobile={isMobile} />;
-      case 'res-warden':  return <ResWardenView   page={currentPage} isMobile={isMobile} />;
-      case 'technician':  return <TechnicianView  page={currentPage} isMobile={isMobile} />;
-      case 'assets':      return <AssetView       page={currentPage} isMobile={isMobile} />;
-      case 'principal':   return <PrincipalView   page={currentPage} isMobile={isMobile} />;
-      default:            return <LoginPage />;
+      case 'login':
+        return <LoginPage />;
+      case 'admin':
+      case 'staff':
+      case 'technician':
+        return <AdminDashboard isMobile={false} />;
+      case 'user':
+      case 'student':
+        return <StudentDashboard isMobile={false} />;
+      default:
+        return <LoginPage />;
     }
-  }, [currentRole, currentPage, viewMode]);
-
-  const activeGrad = COLOR_GRADS[colorTheme] || COLOR_GRADS.purple;
+  }, [currentRole]);
 
   return (
-    <div className="hostelops-root">
-
+    <div className="hostelops-root" style={{ minHeight: '100vh', width: '100%', maxWidth: '100vw', overflowX: 'hidden', background: 'var(--bg-root)', color: 'var(--text-primary)' }}>
+      
       {/* ══ Top Navigation Bar ══ */}
-      <header className="role-nav-bar">
-
+      <header
+        className="role-nav-bar"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px 20px',
+          background: 'var(--bg-surface-glass)',
+          borderBottom: '1px solid var(--border-default)',
+          backdropFilter: 'blur(20px)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 1000,
+        }}
+      >
         {/* Brand */}
-        <div className="nav-brand" onClick={() => handleRoleSwitch('login')}>
-          <div className="nav-brand-icon" style={{ background: activeGrad }}>🏫</div>
-          <span className="nav-brand-name" style={{ backgroundImage: activeGrad }}>{t('app_title', 'HostelOps')}</span>
+        <div
+          className="nav-brand"
+          onClick={() => handleRoleSwitch('login')}
+          style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
+        >
+          <div
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #0284c7, #38bdf8)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '18px',
+              color: '#fff',
+              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
+            }}
+          >
+            🏢
+          </div>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '-0.3px', color: 'var(--text-primary)' }}>
+              Hostel Asset Management
+            </div>
+            <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-accent)', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+              Lifecycle & Audit System
+            </div>
+          </div>
         </div>
 
-        {/* Active Session Identity Badge — 100% Role-Isolated Workspace */}
-        {currentRole !== 'login' ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {/* Active Session Identity Badge */}
+        {currentRole !== 'login' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div
-              onClick={() => dispatch(setProfileModalOpen(true))}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 8,
-                padding: '5px 14px',
-                borderRadius: 'var(--radius-pill)',
+                gap: '8px',
+                padding: '6px 14px',
+                borderRadius: '50px',
                 background: 'var(--accent-primary-soft)',
                 border: '1px solid var(--border-strong)',
-                cursor: 'pointer',
-                transition: 'all 0.15s',
               }}
-              title="Click to view & edit your identity details"
             >
-              <span style={{ fontSize: 14 }}>{ROLE_CONFIG.find(r => r.id === currentRole)?.icon || '👤'}</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>
-                {t(ROLE_CONFIG.find(r => r.id === currentRole)?.key, ROLE_CONFIG.find(r => r.id === currentRole)?.defaultLabel)}
+              <span style={{ fontSize: '14px' }}>
+                {currentRole === 'admin'
+                  ? (adminType === 'superadmin' ? '👑' : '🛡️')
+                  : (currentRole === 'staff' || currentRole === 'technician')
+                  ? '⚡'
+                  : '🎓'}
               </span>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>•</span>
-              <span style={{ fontSize: 11, color: 'var(--text-accent)', fontWeight: 600 }}>
-                {currentUser?.name}
+              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                {currentRole === 'admin'
+                  ? adminType === 'superadmin'
+                    ? 'Super Admin (Admin 1)'
+                    : 'Asset Admin (Admin 2)'
+                  : (currentRole === 'staff' || currentRole === 'technician')
+                  ? `Staff (${currentUser?.name || 'Technician'})`
+                  : `Student (${currentUser?.name || 'Student'})`}
               </span>
-              <span style={{
-                width: 6, height: 6,
-                borderRadius: '50%',
-                background: 'var(--accent-green)',
-                display: 'inline-block',
-              }} />
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>•</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-accent)', fontWeight: 600 }}>
+                {currentUser?.room ? `Room ${currentUser.room}` : currentUser?.name}
+              </span>
+              <span
+                style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: '#10b981',
+                  display: 'inline-block',
+                }}
+              />
             </div>
           </div>
-        ) : (
-          <div style={{ flex: 1 }} />
         )}
 
         {/* Right Controls */}
-        <div className="nav-controls">
-
-          {/* Controls ONLY available when authenticated */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          
+          {/* Controls when authenticated */}
           {currentRole !== 'login' && (
             <>
-              {/* Quick Search / Command Palette Button */}
-              <button
-                className="btn-icon"
-                onClick={() => setShowCmd(true)}
-                title={t('cmd_palette_hint', 'Command Palette (Ctrl+K)')}
-                aria-label="Command palette"
-                style={{ display:'flex', alignItems:'center', justifyContent:'center' }}
-              >
-                🔍
-              </button>
-
-              {/* Keyboard Shortcuts Help */}
-              <button
-                className="btn-icon"
-                onClick={() => setShowShortcuts(true)}
-                title={t('shortcuts_hint', 'Keyboard Shortcuts (?)')}
-                aria-label="Shortcuts"
-                style={{ fontWeight:700, fontSize:13 }}
-              >
-                ?
-              </button>
-
-              {/* View Mode Toggle */}
-              <div className="viewmode-toggle">
+              {/* Notification Bell */}
+              <div style={{ position: 'relative' }}>
                 <button
-                  id="toggle-mobile"
-                  className={`vm-btn ${viewMode === 'mobile' ? 'vm-active' : ''}`}
-                  onClick={() => handleViewMode('mobile')}
-                  title={t('mobile_view', 'Mobile View')}
+                  onClick={() => setShowNotifs(!showNotifs)}
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-default)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '16px',
+                    position: 'relative',
+                  }}
+                  title="Notifications"
                 >
-                  📱
-                </button>
-                <button
-                  id="toggle-desktop"
-                  className={`vm-btn ${viewMode === 'desktop' ? 'vm-active' : ''}`}
-                  onClick={() => handleViewMode('desktop')}
-                  title={t('desktop_view', 'Desktop View')}
-                >
-                  🖥️
-                </button>
-              </div>
-
-              {/* Notification Bell & Dropdown */}
-              <div style={{ position: 'relative' }} onClick={(e) => { e.stopPropagation(); setShowNotifs((p) => !p); }}>
-                <button className="btn-icon" id="notif-bell" title={t('notifications', 'Notifications')}>
                   🔔
                   {unreadCount > 0 && (
-                    <span style={{ position: 'absolute', top: -4, right: -4, width: 17, height: 17, background: 'var(--accent-red)', borderRadius: '50%', fontSize: 9, fontWeight: 700, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg-root)' }}>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: '-3px',
+                        right: '-3px',
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        background: '#ef4444',
+                        color: '#fff',
+                        fontSize: '9px',
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: '2px solid var(--bg-root)',
+                      }}
+                    >
                       {unreadCount}
                     </span>
                   )}
@@ -281,141 +279,224 @@ export default function App() {
                 {/* Notifications Dropdown */}
                 {showNotifs && (
                   <div
-                    onClick={(e) => e.stopPropagation()}
                     style={{
-                      position: 'absolute', top: 'calc(100% + 10px)', right: 0,
-                      width: 320,
-                      background: themeMode === 'light' ? '#fff' : 'linear-gradient(145deg, #162035, #0e1424)',
+                      position: 'absolute',
+                      top: 'calc(100% + 10px)',
+                      right: 0,
+                      width: '320px',
+                      background: 'var(--bg-card)',
                       border: '1px solid var(--border-default)',
-                      borderRadius: 'var(--radius-lg)',
+                      borderRadius: '16px',
                       boxShadow: 'var(--shadow-float)',
                       zIndex: 3000,
                       overflow: 'hidden',
-                      animation: 'slideUp 0.22s var(--t-spring)',
                     }}
                   >
-                    <div style={{ padding: '13px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>{t('notifications', 'Notifications')}</span>
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>Notifications</span>
                       {unreadCount > 0 && (
                         <button
-                          onClick={() => dispatch(markAllNotificationsRead())}
-                          style={{ fontSize: 11, color: 'var(--accent-primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                          onClick={() => {
+                            dispatch(markAllNotificationsRead());
+                            dispatch(markAllNotificationsReadAsync());
+                          }}
+                          style={{ fontSize: '11px', color: 'var(--accent-primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
                         >
-                          {t('mark_all_read', 'Mark all read')}
+                          Mark all read
                         </button>
                       )}
                     </div>
-                    {notifications.slice(0, 6).map((n) => (
+                    {notifications.slice(0, 5).map((n) => (
                       <div
                         key={n.id}
-                        onClick={() => dispatch(markNotificationRead(n.id))}
+                        onClick={() => {
+                          dispatch(markNotificationRead(n.id));
+                          dispatch(markNotificationReadAsync(n.id));
+                        }}
                         style={{
                           padding: '11px 16px',
                           borderBottom: '1px solid var(--border-subtle)',
-                          background: n.isRead ? 'transparent' : 'var(--accent-primary-soft)',
+                          background: (n.isRead || n.is_read) ? 'transparent' : 'var(--accent-primary-soft)',
                           cursor: 'pointer',
-                          transition: 'background 0.15s',
                         }}
                       >
-                        <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5 }}>{n.message}</div>
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>{n.time}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.4 }}>{n.message}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>{n.time || 'Recently'}</div>
                       </div>
                     ))}
                     {notifications.length === 0 && (
-                      <div style={{ padding: '20px 16px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
+                      <div style={{ padding: '20px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
                         No notifications
                       </div>
                     )}
                   </div>
                 )}
               </div>
+
+              {/* Settings Button (Only visible when logged in) */}
+              <button
+                onClick={() => setShowSettings(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 14px',
+                  borderRadius: '10px',
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-default)',
+                  color: 'var(--text-primary)',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                <span>⚙️</span>
+                <span>Settings</span>
+              </button>
+
+              {/* Sign Out Button */}
+              <button
+                onClick={() => {
+                  dispatch(logout());
+                  dispatch(addToast({ id: `logout-${Date.now()}`, message: 'Signed out successfully', type: 'info' }));
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 14px',
+                  borderRadius: '10px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#ef4444',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                <span>🚪</span>
+                <span>Sign Out</span>
+              </button>
             </>
           )}
 
-          {/* Settings Button */}
+          {/* Theme Mode Toggle (Dark / Light) */}
           <button
-            id="settings-btn"
-            className="customize-btn"
-            onClick={() => setShowSettings(true)}
+            onClick={() => dispatch(setThemeMode(themeMode === 'dark' ? 'light' : 'dark'))}
             style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-default)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-pill)',
-              fontWeight: 600,
-              fontSize: 12,
+              justifyContent: 'center',
+              fontSize: '16px',
             }}
+            title="Toggle Dark/Light Mode"
           >
-            <span>⚙️</span>
-            <span>{t('settings', 'Settings')}</span>
+            {themeMode === 'dark' ? '🌙' : '☀️'}
           </button>
-
-          {/* Sign Out Button (Only when authenticated) */}
-          {currentRole !== 'login' && (
-            <button
-              id="logout-nav-btn"
-              onClick={() => {
-                dispatch(setRole('login'));
-                dispatch(addToast({ id: `logout-${Date.now()}`, message: 'Signed out successfully', type: 'info' }));
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '6px 13px',
-                borderRadius: 'var(--radius-pill)',
-                background: 'rgba(239, 68, 68, 0.08)',
-                border: '1px solid rgba(239, 68, 68, 0.25)',
-                color: '#ef4444',
-                fontWeight: 600,
-                fontSize: 12,
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-              }}
-              title="Sign out of current workspace"
-            >
-              <span>🚪</span>
-              <span>Sign Out</span>
-            </button>
-          )}
 
         </div>
       </header>
 
+      {/* ══ Connection Status Banner (Requirement 9) ══ */}
+      {!isBackendConnected && (
+        <div
+          style={{
+            background: 'linear-gradient(90deg, rgba(239,68,68,0.15), rgba(245,158,11,0.15))',
+            borderBottom: '1px solid rgba(239,68,68,0.3)',
+            padding: '8px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '12px',
+            color: '#ef4444',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>⚠️</span>
+            <span>
+              <strong>Backend Service Disconnected:</strong> {connectionError || 'Unable to connect to Node.js backend at http://localhost:5000'}
+            </span>
+          </div>
+          <button
+            onClick={() => dispatch(fetchInitialData())}
+            style={{
+              padding: '4px 12px',
+              borderRadius: '6px',
+              background: '#ef4444',
+              color: '#fff',
+              border: 'none',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Retry Connection
+          </button>
+        </div>
+      )}
+      {isBackendConnected && dbStatus === 'disconnected' && (
+        <div
+          style={{
+            background: 'linear-gradient(90deg, rgba(245,158,11,0.15), rgba(234,179,8,0.15))',
+            borderBottom: '1px solid rgba(245,158,11,0.3)',
+            padding: '8px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '12px',
+            color: '#f59e0b',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>⚠️</span>
+            <span>
+              <strong>Database Notice:</strong> Backend is online, but MongoDB connection is currently unavailable.
+            </span>
+          </div>
+          <button
+            onClick={() => dispatch(fetchInitialData())}
+            style={{
+              padding: '4px 12px',
+              borderRadius: '6px',
+              background: '#f59e0b',
+              color: '#fff',
+              border: 'none',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Reconnect
+          </button>
+        </div>
+      )}
+
       {/* ══ Main Viewport ══ */}
-      <main className="main-viewport">
+      <main className="main-viewport" style={{ paddingBottom: '60px' }}>
         {ActiveView}
       </main>
 
-      {/* ══ Global Modals & Drawers ══ */}
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-      />
+      {/* ══ Global Lifecycle Modals ══ */}
+      <AddAssetModal />
+      <AllocateAssetModal />
+      <TransferAssetModal />
+      <ReturnAssetModal />
+      <MaintenanceModal />
+      <AuditModal />
+      <DisposalModal />
+      <RequestAssetModal />
+      <QrPreviewModal />
+      <QrScannerModal />
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
-      <CommandPalette
-        isOpen={showCmd}
-        onClose={() => setShowCmd(false)}
-      />
-
-      <KeyboardShortcutsModal
-        isOpen={showShortcuts}
-        onClose={() => setShowShortcuts(false)}
-      />
-
-      <TicketDrawer />
-      <HostelBotAI
-        isOpen={aiDrawerOpen}
-        onClose={() => dispatch(setAiDrawerOpen(false))}
-      />
-      <HostelFloorplan
-        isOpen={floorplanModalOpen}
-        onClose={() => dispatch(setFloorplanModalOpen(false))}
-      />
-      <UserProfileModal />
-
-      {/* ══ Global Toast System ══ */}
+      {/* ══ Global Toast Alerts ══ */}
       <ToastHost />
 
     </div>

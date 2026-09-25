@@ -1,21 +1,29 @@
 /**
- * HostelOps Centralized API Service
- * Handles all communication between the React Frontend and Express Backend.
+ * Hostel Asset Management System — API Service
+ * Central REST Client with Authorization Header Injection & Unified Error Handling
  */
 
-const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:5000/api';
+import { getToken, clearSession } from '../utils/authStorage';
+
+// Use Vite proxy (/api) in development, configurable via VITE_API_URL in production
+const API_BASE_URL = import.meta.env?.VITE_API_URL || '/api';
 
 /**
- * Generic request wrapper with error handling and JSON decoding
+ * Central HTTP Request handler
  */
 async function request(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
+  const token = getToken();
+
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
+
   const config = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
     ...options,
+    headers,
   };
 
   if (config.body && typeof config.body === 'object') {
@@ -24,77 +32,58 @@ async function request(endpoint, options = {}) {
 
   try {
     const response = await fetch(url, config);
-
-    // Handle non-JSON responses gracefully
     const contentType = response.headers.get('content-type');
     const isJson = contentType && contentType.includes('application/json');
     const data = isJson ? await response.json() : await response.text();
 
     if (!response.ok) {
-      const errorMsg = data?.error || data?.message || `HTTP ${response.status}: ${response.statusText}`;
+      // 401 Session expired handling (Requirement 8)
+      if (response.status === 401) {
+        clearSession();
+        const msg = (typeof data === 'object' && (data?.message || data?.error)) || 'Session expired. Please sign in again.';
+        // Dispatch session-expired custom event so UI can prompt login
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('hostelops:session-expired', { detail: { message: msg } }));
+        }
+        throw new Error(msg);
+      }
+
+      // 403 Forbidden handling
+      if (response.status === 403) {
+        const msg = (typeof data === 'object' && (data?.message || data?.error)) || 'Access forbidden: Insufficient permissions.';
+        throw new Error(msg);
+      }
+
+      const errorMsg =
+        (typeof data === 'object' && (data?.message || data?.error)) ||
+        `HTTP ${response.status}: ${response.statusText}`;
       throw new Error(errorMsg);
     }
 
     return data;
   } catch (err) {
+    if (err.name === 'TypeError' && err.message.toLowerCase().includes('fetch')) {
+      console.warn(`[API Network Error] ${url} is unreachable.`);
+      throw new Error('HostelOps backend is currently unreachable. Please check backend server status.', { cause: err });
+    }
     console.error(`[API Error] ${options.method || 'GET'} ${url}:`, err.message);
     throw err;
   }
 }
 
 export const api = {
-  // ── Auth & Profile ──
+  // ── 1. Auth & Profiles ──
   auth: {
-    getProfile: (role) => request(`/user/profile${role ? `?role=${role}` : ''}`),
-    login: (credentials) => {
-      const payload = typeof credentials === 'string' ? { role: credentials } : credentials;
-      return request('/auth/login', { method: 'POST', body: payload });
-    },
-    getSecurityCheck: () => request('/auth/security-check'),
+    getDemoAccounts: () => request('/auth/demo-accounts'),
+    getUsers: () => request('/auth/users'),
+    registerUser: (data) => request('/auth/register', { method: 'POST', body: data }),
+    login: (credentials) => request('/auth/login', { method: 'POST', body: credentials }),
+    getProfile: (params = '') => request(`/user/profile${params ? `?${params}` : ''}`),
+    getMe: () => request('/auth/me'),
+    updateProfile: (data) => request('/auth/profile', { method: 'PATCH', body: data }),
   },
 
-  // ── Tickets & Complaints ──
-  tickets: {
-    getAll: (params = {}) => {
-      const qs = new URLSearchParams(params).toString();
-      return request(`/tickets${qs ? `?${qs}` : ''}`);
-    },
-    getById: (id) => request(`/tickets/${id}`),
-    create: (data) => request('/tickets', { method: 'POST', body: data }),
-    resolve: (id, payload = {}) => request(`/tickets/${id}/resolve`, { method: 'PATCH', body: payload }),
-    assign: (id, workerName, actor) => request(`/tickets/${id}/assign`, { method: 'PATCH', body: { workerName, actor } }),
-    updatePriority: (id, priority) => request(`/tickets/${id}/priority`, { method: 'PATCH', body: { priority } }),
-    bulkUpdateStatus: (ids, status) => request('/tickets/bulk-status', { method: 'PATCH', body: { ids, status } }),
-    getAllComments: () => request('/tickets/comments/all'),
-    getComments: (id) => request(`/tickets/${id}/comments`),
-    addComment: (id, commentData) => request(`/tickets/${id}/comments`, { method: 'POST', body: commentData }),
-    getAllRatings: () => request('/tickets/ratings/all'),
-    rate: (id, rating) => request(`/tickets/${id}/rate`, { method: 'POST', body: { rating } }),
-  },
-
-  // ── Staff Requests ──
-  requests: {
-    getAll: (params = {}) => {
-      const qs = new URLSearchParams(params).toString();
-      return request(`/requests${qs ? `?${qs}` : ''}`);
-    },
-    create: (data) => request('/requests', { method: 'POST', body: data }),
-    approve: (id, actor) => request(`/requests/${id}/approve`, { method: 'PATCH', body: { actor } }),
-    reject: (id, actor) => request(`/requests/${id}/reject`, { method: 'PATCH', body: { actor } }),
-    bulkApprove: (ids, actor) => request('/requests/bulk-approve', { method: 'PATCH', body: { ids, actor } }),
-  },
-
-  // ── Workers Directory ──
-  workers: {
-    getAll: (params = {}) => {
-      const qs = new URLSearchParams(params).toString();
-      return request(`/workers${qs ? `?${qs}` : ''}`);
-    },
-    toggleAvailability: (id, availability) => request(`/workers/${id}/availability`, { method: 'PATCH', body: { availability } }),
-    getJobs: (name) => request(`/workers/${encodeURIComponent(name)}/jobs`),
-  },
-
-  // ── Assets & QR Inventory ──
+  // ── 2. Asset Register ──
   assets: {
     getAll: (params = {}) => {
       const qs = new URLSearchParams(params).toString();
@@ -102,26 +91,58 @@ export const api = {
     },
     getByTag: (tag) => request(`/assets/${encodeURIComponent(tag)}`),
     create: (data) => request('/assets', { method: 'POST', body: data }),
-    updateCondition: (tag, condition, actor, cost = 0, action = 'Condition Update') => request(`/assets/${encodeURIComponent(tag)}/condition`, { method: 'PATCH', body: { condition, actor, cost, action } }),
+    update: (tag, data) => request(`/assets/${encodeURIComponent(tag)}`, { method: 'PUT', body: data }),
+    delete: (tag) => request(`/assets/${encodeURIComponent(tag)}`, { method: 'DELETE' }),
+
+    // ── 3. Categories ──
+    getCategories: () => request('/assets/categories/all'),
+    createCategory: (data) => request('/assets/categories', { method: 'POST', body: data }),
+
+    // ── 4. Allocation ──
+    allocate: (data) => request('/assets/allocate', { method: 'POST', body: data }),
+
+    // ── 5. Return & Transfer ──
+    returnAsset: (data) => request('/assets/return', { method: 'POST', body: data }),
     transfer: (data) => request('/assets/transfer', { method: 'POST', body: data }),
-    getTransfers: () => request('/assets/transfers'),
+    getTransfers: () => request('/assets/transfers/all'),
+
+    // ── 6. Maintenance & Repairs ──
+    getMaintenance: () => request('/assets/maintenance/all'),
+    reportMaintenance: (data) => request('/assets/maintenance', { method: 'POST', body: data }),
+    updateMaintenance: (ticketId, data) =>
+      request(`/assets/maintenance/${encodeURIComponent(ticketId)}`, { method: 'PATCH', body: data }),
+
+    // ── 7. Inventory Physical Audits ──
+    getAudits: () => request('/assets/audits/all'),
     submitAudit: (data) => request('/assets/audit', { method: 'POST', body: data }),
-    getAudits: () => request('/assets/audits'),
-    submitHandover: (data) => request('/assets/handover', { method: 'POST', body: data }),
-    getHandovers: () => request('/assets/handovers'),
-    clearHandover: (id, data) => request(`/assets/handover/${id}/clear`, { method: 'PATCH', body: data }),
-    getInventorySummary: () => request('/assets/inventory-summary'),
-    retire: (tag) => request(`/assets/${encodeURIComponent(tag)}`, { method: 'DELETE' }),
-    getByStudent: (roll) => request(`/assets/by-student/${encodeURIComponent(roll)}`),
+
+    // ── 8. Asset Disposal ──
+    getDisposals: () => request('/assets/disposal/all'),
+    submitDisposal: (data) => request('/assets/disposal', { method: 'POST', body: data }),
+
+    // ── 9. Student Asset Requests ──
+    getRequests: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/assets/requests/all${qs ? `?${qs}` : ''}`);
+    },
+    submitRequest: (data) => request('/assets/requests', { method: 'POST', body: data }),
+    reviewRequest: (requestId, data) =>
+      request(`/assets/requests/${encodeURIComponent(requestId)}`, { method: 'PATCH', body: data }),
+
+    // ── 10. Reports & Summary ──
+    getReportsSummary: () => request('/assets/reports/summary'),
   },
 
-  // ── Budget & Analytics ──
-  budget: {
-    get: () => request('/budget'),
-    update: (data) => request('/budget', { method: 'PATCH', body: data }),
-  },
+  // ── Analytics Overview ──
   analytics: {
     getOverview: () => request('/analytics/overview'),
+  },
+
+  // ── Workers Directory ──
+  workers: {
+    getAll: () => request('/workers'),
+    toggleAvailability: (id, availability) =>
+      request(`/workers/${id}/availability`, { method: 'PATCH', body: { availability } }),
   },
 
   // ── Notifications ──
@@ -134,14 +155,14 @@ export const api = {
 
   // ── Audit Logs ──
   audit: {
-    getAll: (params = {}) => {
-      const qs = new URLSearchParams(params).toString();
-      return request(`/audit-logs${qs ? `?${qs}` : ''}`);
-    },
+    getAll: () => request('/audit-logs'),
     create: (data) => request('/audit-logs', { method: 'POST', body: data }),
   },
 
-  // Health check
+  // ── System Health ──
+  system: {
+    health: () => request('/health'),
+  },
   health: () => request('/health'),
 };
 
