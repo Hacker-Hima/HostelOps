@@ -1,4 +1,4 @@
-# HostelOps — Hostel Asset & Lifecycle Management System
+# HostelOps: Real-Time Hostel Service & Asset Management
 
 An enterprise-grade, full-stack Hostel Asset Management and Lifecycle Management System designed for educational institutions, university residential hostels, and facility operations. Built with a modern **React 19 + Redux Toolkit** frontend and an **Express 5 + MongoDB / Mongoose** backend.
 
