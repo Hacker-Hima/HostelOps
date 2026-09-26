@@ -159,6 +159,67 @@ export const api = {
     create: (data) => request('/audit-logs', { method: 'POST', body: data }),
   },
 
+  // ── Rooms & Digital Twin ──
+  rooms: {
+    getAll: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/rooms${qs ? `?${qs}` : ''}`);
+    },
+    getDigitalTwin: (block) => request(`/rooms/digital-twin/${encodeURIComponent(block)}`),
+    getDetail: (roomNumber, block) =>
+      request(`/rooms/${encodeURIComponent(roomNumber)}${block ? `?block=${encodeURIComponent(block)}` : ''}`),
+    create: (data) => request('/rooms', { method: 'POST', body: data }),
+    update: (roomNumber, data, block) =>
+      request(`/rooms/${encodeURIComponent(roomNumber)}${block ? `?block=${encodeURIComponent(block)}` : ''}`, {
+        method: 'PATCH',
+        body: data,
+      }),
+  },
+
+  // ── Residents & Semester Checkout ──
+  residents: {
+    getAll: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/residents${qs ? `?${qs}` : ''}`);
+    },
+    getDetail: (rollNumber) => request(`/residents/${encodeURIComponent(rollNumber)}`),
+    create: (data) => request('/residents', { method: 'POST', body: data }),
+    checkout: (rollNumber, data) =>
+      request(`/residents/${encodeURIComponent(rollNumber)}/checkout`, { method: 'POST', body: data }),
+    clearance: (rollNumber, data) =>
+      request(`/residents/${encodeURIComponent(rollNumber)}/clearance`, { method: 'PATCH', body: data }),
+  },
+
+  // ── AI Operations Copilot ──
+  ai: {
+    copilot: (data) => request('/ai/copilot', { method: 'POST', body: data }),
+  },
+
+  // ── Procurement & Vendor Lifecycle ──
+  procurement: {
+    getVendors: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/procurement/vendors${qs ? `?${qs}` : ''}`);
+    },
+    getVendorDetail: (vendorId) => request(`/procurement/vendors/${encodeURIComponent(vendorId)}`),
+    createVendor: (data) => request('/procurement/vendors', { method: 'POST', body: data }),
+    getOrders: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/procurement/orders${qs ? `?${qs}` : ''}`);
+    },
+    createOrder: (data) => request('/procurement/orders', { method: 'POST', body: data }),
+    updateOrderStatus: (poNumber, status) =>
+      request(`/procurement/orders/${encodeURIComponent(poNumber)}/status`, {
+        method: 'PATCH',
+        body: { status },
+      }),
+    receiveGoods: (poNumber, data) =>
+      request(`/procurement/orders/${encodeURIComponent(poNumber)}/receive`, {
+        method: 'POST',
+        body: data,
+      }),
+  },
+
   // ── System Health ──
   system: {
     health: () => request('/health'),

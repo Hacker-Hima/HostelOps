@@ -13,6 +13,15 @@ import {
   Notification,
 } from '../models/index.js';
 import { authenticate, optionalAuthenticate, requireRole, requireAdminType } from '../middleware/auth.js';
+import { requirePermission, PERMISSIONS } from '../middleware/permissions.js';
+import {
+  generateAssetTag,
+  generateTicketId,
+  generateRequestId,
+  generateAuditId,
+  generateTransferId,
+  generateDisposalId,
+} from '../utils/idGenerator.js';
 
 const router = express.Router();
 
@@ -317,7 +326,7 @@ router.post('/', authenticate, requireRole(['admin']), async (req, res) => {
 });
 
 // PUT /api/assets/:tag — Update asset details
-router.put('/:tag', optionalAuthenticate, async (req, res) => {
+router.put('/:tag', authenticate, requirePermission(PERMISSIONS.ASSET_EDIT), async (req, res) => {
   try {
     const { tag } = req.params;
     const asset = await Asset.findOne({ tag: tag.trim() });
@@ -397,7 +406,7 @@ router.put('/:tag', optionalAuthenticate, async (req, res) => {
 });
 
 // DELETE /api/assets/:tag — Delete asset (Super Admin / Admin protected)
-router.delete('/:tag', optionalAuthenticate, async (req, res) => {
+router.delete('/:tag', authenticate, requireRole('admin'), requirePermission(PERMISSIONS.ASSET_DELETE), async (req, res) => {
   try {
     const { tag } = req.params;
     const asset = await Asset.findOne({ tag: tag.trim() });
@@ -459,7 +468,7 @@ router.get('/categories/all', async (req, res) => {
 });
 
 // POST /api/assets/categories — Add a new category
-router.post('/categories', optionalAuthenticate, async (req, res) => {
+router.post('/categories', authenticate, requireRole('admin'), async (req, res) => {
   try {
     const { name, icon = '📦', description = '', defaultDepreciationRate = 10, color = '#7c3aed' } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Category name is required.' });
@@ -853,7 +862,7 @@ router.get('/maintenance/all', async (req, res) => {
 });
 
 // POST /api/assets/maintenance — Report damaged asset / request maintenance
-router.post('/maintenance', optionalAuthenticate, async (req, res) => {
+router.post('/maintenance', authenticate, async (req, res) => {
   try {
     const {
       assetTag,
@@ -896,7 +905,7 @@ router.post('/maintenance', optionalAuthenticate, async (req, res) => {
       const tickets = await AssetMaintenance.create(
         [
           {
-            ticket_id: `MNT-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+            ticket_id: generateTicketId(),
             asset_tag: asset.tag,
             asset_name: asset.name,
             category: asset.category,
@@ -938,7 +947,7 @@ router.post('/maintenance', optionalAuthenticate, async (req, res) => {
 });
 
 // PATCH /api/assets/maintenance/:ticketId — Update maintenance ticket
-router.patch('/maintenance/:ticketId', optionalAuthenticate, async (req, res) => {
+router.patch('/maintenance/:ticketId', authenticate, async (req, res) => {
   try {
     const { ticketId } = req.params;
     const {
@@ -1185,7 +1194,7 @@ router.get('/requests/all', async (req, res) => {
 });
 
 // POST /api/assets/requests — Student submits a request for an asset
-router.post('/requests', optionalAuthenticate, async (req, res) => {
+router.post('/requests', authenticate, async (req, res) => {
   try {
     const {
       studentRoll,
@@ -1203,7 +1212,7 @@ router.post('/requests', optionalAuthenticate, async (req, res) => {
     }
 
     const request = await AssetRequest.create({
-      request_id: `REQ-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+      request_id: generateRequestId(),
       student_roll: studentRoll.trim(),
       student_name: studentName ? studentName.trim() : (req.user?.name || 'Student'),
       room: room || '101',
@@ -1230,8 +1239,8 @@ router.post('/requests', optionalAuthenticate, async (req, res) => {
   }
 });
 
-// PATCH /api/assets/requests/:requestId — Admin reviews/approves request
-router.patch('/requests/:requestId', optionalAuthenticate, async (req, res) => {
+// PATCH /api/assets/requests/:requestId — Admin/Warden reviews/approves request
+router.patch('/requests/:requestId', authenticate, requirePermission(PERMISSIONS.REQUEST_APPROVE), async (req, res) => {
   try {
     const { requestId } = req.params;
     const { status, reviewedBy = 'Asset Admin', allocatedAssetTag = '', reviewNotes = '' } = req.body;

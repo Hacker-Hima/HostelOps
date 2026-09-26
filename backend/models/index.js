@@ -14,3 +14,7 @@ export {
 export { AuditLog } from './AuditLog.js';
 export { Notification } from './Notification.js';
 export { Budget, BudgetCategory } from './Budget.js';
+export { Hostel, Room } from './Hostel.js';
+export { Resident } from './Resident.js';
+export { Vendor } from './Vendor.js';
+export { PurchaseOrder } from './PurchaseOrder.js';

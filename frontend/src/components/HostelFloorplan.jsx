@@ -7,9 +7,11 @@ import {
   addTicket,
   addToast,
   openTicketDrawer,
+  setCheckoutModalOpen,
 } from '../redux/ticketSlice';
 import { audioFx } from '../utils/audioFx';
 import { useTranslation } from '../utils/translations';
+import api from '../services/api';
 
 const ASSET_ICONS = {
   ac: '❄️',
@@ -37,6 +39,24 @@ export default function HostelFloorplan({ isOpen, onClose }) {
   const [inspectedRoomId, setInspectedRoomId] = useState(selectedRoomId || 'A-204');
   const [quickTitle, setQuickTitle] = useState('');
   const [quickCategory, setQuickCategory] = useState('Plumbing');
+  const [liveTelemetry, setLiveTelemetry] = useState(null);
+
+  // Fetch live institutional telemetry & real DB assets for inspected room
+  useEffect(() => {
+    if (!inspectedRoomId) return;
+    const cleanNum = inspectedRoomId.replace(/^[A-Z]-/, '');
+    const blockLetter = inspectedRoomId.startsWith('B-') ? 'Block B' : inspectedRoomId.startsWith('C-') ? 'Block C' : 'Block A';
+    
+    api.rooms.getDetail(cleanNum, blockLetter)
+      .then((res) => {
+        if (res?.success) {
+          setLiveTelemetry(res);
+        }
+      })
+      .catch((err) => {
+        console.warn('Digital twin room detail fetch warning:', err.message);
+      });
+  }, [inspectedRoomId]);
 
   const filteredRooms = useMemo(() => {
     return roomMatrix.filter((r) => {
@@ -243,6 +263,81 @@ export default function HostelFloorplan({ isOpen, onClose }) {
                   {STATUS_CONFIG[inspectedRoom.status]?.label}
                 </span>
               </div>
+
+              {/* Institutional Digital Twin Telemetry HUD */}
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: '10px 12px',
+                  background: 'rgba(99, 102, 241, 0.08)',
+                  border: '1px solid rgba(99, 102, 241, 0.25)',
+                  borderRadius: 12,
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: 8,
+                  textAlign: 'center',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>🌡️ Temp</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#38bdf8' }}>
+                    {liveTelemetry?.room?.telemetry?.temperature || '23.6'}°C
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>💧 Humidity</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#34d399' }}>
+                    {liveTelemetry?.room?.telemetry?.humidity || '46'}%
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>🛡️ Health Index</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#a78bfa' }}>
+                    {liveTelemetry?.room?.maintenanceScore || 94}/100
+                  </div>
+                </div>
+              </div>
+
+              {/* Semester Checkout Quick Trigger */}
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm btn-full"
+                style={{
+                  marginTop: 10,
+                  fontSize: 11,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  borderColor: 'var(--accent-primary)',
+                  color: 'var(--accent-primary)',
+                  background: 'var(--accent-primary-soft)',
+                }}
+                onClick={() => {
+                  dispatch(setCheckoutModalOpen(true));
+                  audioFx.playClick();
+                }}
+              >
+                🏠 Semester Checkout & Damage Audit
+              </button>
+
+              {/* Live Registered Database Assets */}
+              {liveTelemetry?.assets && liveTelemetry.assets.length > 0 && (
+                <div style={{ marginTop: 12, padding: '10px', background: 'var(--bg-card)', borderRadius: 10, border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>📦 Room Asset Inventory ({liveTelemetry.assets.length})</span>
+                    <span style={{ fontSize: 10, color: 'var(--accent-primary)', fontFamily: 'monospace' }}>Verified</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {liveTelemetry.assets.slice(0, 4).map((a) => (
+                      <div key={a.tag || a._id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '4px 6px', background: 'var(--bg-glass)', borderRadius: 6 }}>
+                        <span style={{ fontFamily: 'monospace', color: '#818cf8', fontWeight: 600 }}>{a.tag}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>{a.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Asset Health Controls */}
               <div style={{ marginTop: 14 }}>

@@ -12,6 +12,10 @@ import budgetRoutes from './routes/budget.js';
 import analyticsRoutes from './routes/analytics.js';
 import notificationRoutes from './routes/notifications.js';
 import auditRoutes from './routes/audit.js';
+import roomRoutes from './routes/rooms.js';
+import residentRoutes from './routes/residents.js';
+import aiRoutes from './routes/ai.js';
+import procurementRoutes from './routes/procurement.js';
 
 dotenv.config();
 
@@ -114,6 +118,10 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/workers', workerRoutes);
+app.use('/api/rooms', roomRoutes);
+app.use('/api/residents', residentRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/procurement', procurementRoutes);
 
 // Compatibility mount for legacy ticket & staff-request routes
 app.use('/api/tickets', ticketRoutes);

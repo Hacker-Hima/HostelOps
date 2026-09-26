@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { setAiDrawerOpen, addTicket, addToast } from '../redux/ticketSlice';
 import { audioFx } from '../utils/audioFx';
 import { useTranslation } from '../utils/translations';
+import api from '../services/api';
 
 const SMART_PROMPTS = [
   { id: 'diag_ac', icon: '❄️', label: 'Diagnose AC cooling defect', query: 'My AC is turning on but blowing room-temperature air. What should I check?' },
@@ -80,8 +81,8 @@ export default function HostelBotAI({ isOpen, onClose }) {
     {
       id: 'm1',
       sender: 'bot',
-      text: `👋 **Hello ${currentUser.name}!** I am **HostelBot AI**, your intelligent hostel operations copilot.
-How can I assist you today? You can choose a quick diagnostic below or ask me any hostel maintenance question!`,
+      text: `👋 **Hello ${currentUser?.name || 'Operator'}!** I am **HostelBot AI**, your institutional operations copilot connected to live hostel inventory and telemetry.
+How can I assist you today? You can select a quick operational diagnosis below or ask any facility question!`,
       time: 'Just now',
     },
   ]);
@@ -95,7 +96,7 @@ How can I assist you today? You can choose a quick diagnostic below or ask me an
     }
   }, [messages, isTyping]);
 
-  const handleSendPrompt = (promptKey, queryText) => {
+  const handleSendPrompt = async (promptKey, queryText) => {
     audioFx.playClick();
     const userMsg = {
       id: `u-${Date.now()}`,
@@ -106,6 +107,34 @@ How can I assist you today? You can choose a quick diagnostic below or ask me an
     setMessages((prev) => [...prev, userMsg]);
     setIsTyping(true);
 
+    try {
+      const res = await api.ai.copilot({
+        message: queryText,
+        contextRoom: currentUser?.room || 'A-204',
+        promptId: promptKey,
+      });
+
+      setIsTyping(false);
+      if (res && res.success && res.message) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `b-${Date.now()}`,
+            sender: 'bot',
+            text: res.message,
+            time: 'Just now',
+            suggestTicket: res.suggestedAction?.type === 'CREATE_TICKET' ? res.suggestedAction : null,
+            suggestAction: res.suggestedAction,
+          },
+        ]);
+        audioFx.playChime();
+        return;
+      }
+    } catch (err) {
+      console.warn('AI copilot online query failed, falling back to heuristics:', err.message);
+    }
+
+    // Graceful offline fallback
     setTimeout(() => {
       setIsTyping(false);
       const resp = PRESET_RESPONSES[promptKey] || {
@@ -130,7 +159,7 @@ Based on our real-time hostel maintenance logs and asset health index:
         },
       ]);
       audioFx.playChime();
-    }, 700);
+    }, 500);
   };
 
   const handleCustomSubmit = (e) => {
@@ -152,7 +181,9 @@ Based on our real-time hostel maintenance logs and asset health index:
 
   const handleCreateTicketFromAI = (suggested) => {
     if (!suggested) return;
-    const newId = `TKT-${Math.floor(100 + Math.random() * 900)}`;
+    const year = new Date().getFullYear();
+    const randNum = Math.floor(1000 + Math.random() * 9000);
+    const newId = `TKT-${year}-${randNum}`;
     const tk = {
       id: newId,
       title: suggested.title,
@@ -161,7 +192,7 @@ Based on our real-time hostel maintenance logs and asset health index:
       category: suggested.category || 'Electrical',
       priority: suggested.priority || 'High',
       status: 'Pending',
-      assignedWorker: 'Unassigned',
+      assignedWorker: suggested.workerName || 'Unassigned',
       assetTag: `QR-${currentUser.room || 'A-204'}-AI-01`,
       createdAt: 'Just now',
       creatorRole: 'HostelBot AI',

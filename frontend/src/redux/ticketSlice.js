@@ -51,6 +51,8 @@ export const fetchInitialData = createAsyncThunk(
         api.audit.getAll(),
         api.notifications.getAll(),
         api.auth.getUsers(),
+        api.rooms.getAll(),
+        api.residents.getAll(),
       ];
 
       const results = await Promise.allSettled(endpoints);
@@ -68,6 +70,8 @@ export const fetchInitialData = createAsyncThunk(
         auditLogsRes,
         notifsRes,
         usersRes,
+        roomsRes,
+        residentsRes,
       ] = results;
 
       const failedEndpoints = [];
@@ -87,6 +91,12 @@ export const fetchInitialData = createAsyncThunk(
           }))
         : [];
 
+      const rawRooms = extract(roomsRes, 'rooms', { rooms: [] });
+      const roomsData = Array.isArray(rawRooms) ? rawRooms : rawRooms?.rooms || [];
+
+      const rawResidents = extract(residentsRes, 'residents', { residents: [] });
+      const residentsData = Array.isArray(rawResidents) ? rawResidents : rawResidents?.residents || [];
+
       return {
         assets: extract(assetsRes, 'assets', []),
         categories: extract(categoriesRes, 'categories', []),
@@ -100,6 +110,8 @@ export const fetchInitialData = createAsyncThunk(
         auditLogs: extract(auditLogsRes, 'auditLogs', []),
         notifications: normalizedNotifs,
         usersList: extract(usersRes, 'users', []),
+        roomsList: roomsData,
+        residentsList: residentsData,
         failedEndpoints,
         dbStatus: health?.database?.connected ? 'connected' : 'unknown',
       };
@@ -370,6 +382,8 @@ const initialState = {
   auditLogs: [],
   notifications: [],
   usersList: [],
+  roomsList: [],
+  residentsList: [],
 
   /* Modals & Overlays */
   selectedAssetTag: null,
@@ -384,6 +398,7 @@ const initialState = {
   requestAssetModalOpen: false,
   profileModalOpen: false,
   settingsModalOpen: false,
+  checkoutModalOpen: false,
   qrPreviewTag: null,
 
   /* Filters & Search */
@@ -548,6 +563,15 @@ export const ticketSlice = createSlice({
         n.is_read = 1;
       });
     },
+    setCheckoutModalOpen: (state, action) => {
+      state.checkoutModalOpen = action.payload;
+    },
+    setRoomsList: (state, action) => {
+      state.roomsList = action.payload;
+    },
+    setResidentsList: (state, action) => {
+      state.residentsList = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -573,6 +597,8 @@ export const ticketSlice = createSlice({
         state.auditLogs = action.payload.auditLogs;
         state.notifications = action.payload.notifications;
         state.usersList = action.payload.usersList;
+        state.roomsList = action.payload.roomsList || [];
+        state.residentsList = action.payload.residentsList || [];
       })
       .addCase(fetchInitialData.rejected, (state, action) => {
         state.isLoading = false;
@@ -751,6 +777,9 @@ export const {
   setRequestAssetModalOpen,
   setProfileModalOpen,
   setSettingsModalOpen,
+  setCheckoutModalOpen,
+  setRoomsList,
+  setResidentsList,
   addToast,
   removeToast,
   markNotificationRead,

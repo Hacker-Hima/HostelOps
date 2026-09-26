@@ -26,22 +26,40 @@ const assetSchema = new mongoose.Schema(
       default: 'Assigned',
     },
     purchase_date: { type: String, default: '2024-06-12' },
+    purchaseDate: { type: Date, default: () => new Date('2024-06-12'), index: true },
     purchase_cost: { type: Number, default: 0 },
     current_value: { type: Number, default: 0 },
     depreciation_rate: { type: Number, default: 10 }, // Annual %
     warranty_expiry: { type: String, default: '2027-06-12' },
+    warrantyExpiry: { type: Date, default: () => new Date('2027-06-12'), index: true },
     supplier: { type: String, default: 'Apex Institutional Furnishings Ltd.' },
     serial_number: { type: String, default: '' },
     quantity: { type: Number, default: 1 },
     assigned_student_roll: { type: String, default: '' },
     assigned_student_name: { type: String, default: '' },
     assigned_date: { type: String, default: '' },
+    assignedDate: { type: Date, default: null },
     last_checked: { type: String, required: true, default: 'Today' },
     qr_code_data: { type: String, default: '' },
     notes: { type: String, default: '' },
   },
   { timestamps: true }
 );
+
+assetSchema.pre('save', function () {
+  if (this.purchase_date && (!this.purchaseDate || isNaN(this.purchaseDate.getTime()))) {
+    const d = new Date(this.purchase_date);
+    if (!isNaN(d.getTime())) this.purchaseDate = d;
+  }
+  if (this.warranty_expiry && (!this.warrantyExpiry || isNaN(this.warrantyExpiry.getTime()))) {
+    const d = new Date(this.warranty_expiry);
+    if (!isNaN(d.getTime())) this.warrantyExpiry = d;
+  }
+  if (this.assigned_date && (!this.assignedDate || isNaN(this.assignedDate.getTime()))) {
+    const d = new Date(this.assigned_date);
+    if (!isNaN(d.getTime())) this.assignedDate = d;
+  }
+});
 
 const assetCategorySchema = new mongoose.Schema(
   {
@@ -79,12 +97,25 @@ const assetMaintenanceSchema = new mongoose.Schema(
     repair_cost: { type: Number, default: 0 },
     parts_replaced: { type: String, default: '' },
     reported_date: { type: String, required: true },
+    reportedDate: { type: Date, default: Date.now, index: true },
     completed_date: { type: String, default: '' },
+    completedDate: { type: Date, default: null },
     notes: { type: String, default: '' },
     color: { type: String, default: '#06b6d4' },
   },
   { timestamps: true }
 );
+
+assetMaintenanceSchema.pre('save', function () {
+  if (this.reported_date && (!this.reportedDate || isNaN(this.reportedDate.getTime()))) {
+    const d = new Date(this.reported_date);
+    if (!isNaN(d.getTime())) this.reportedDate = d;
+  }
+  if (this.completed_date && (!this.completedDate || isNaN(this.completedDate.getTime()))) {
+    const d = new Date(this.completed_date);
+    if (!isNaN(d.getTime())) this.completedDate = d;
+  }
+});
 
 const assetTransferSchema = new mongoose.Schema(
   {
@@ -98,9 +129,17 @@ const assetTransferSchema = new mongoose.Schema(
     transferred_by: { type: String, required: true },
     reason: { type: String, default: 'Room reallocation' },
     date: { type: String, required: true },
+    transferDate: { type: Date, default: Date.now, index: true },
   },
   { timestamps: true }
 );
+
+assetTransferSchema.pre('save', function () {
+  if (this.date && (!this.transferDate || isNaN(this.transferDate.getTime()))) {
+    const d = new Date(this.date);
+    if (!isNaN(d.getTime())) this.transferDate = d;
+  }
+});
 
 const assetAuditSchema = new mongoose.Schema(
   {
@@ -110,6 +149,7 @@ const assetAuditSchema = new mongoose.Schema(
     room: { type: String, required: true },
     auditor: { type: String, required: true },
     date: { type: String, required: true },
+    auditDate: { type: Date, default: Date.now, index: true },
     expected_count: { type: Number, default: 0 },
     scanned_count: { type: Number, default: 0 },
     missing_count: { type: Number, default: 0 },
@@ -121,6 +161,13 @@ const assetAuditSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+assetAuditSchema.pre('save', function () {
+  if (this.date && (!this.auditDate || isNaN(this.auditDate.getTime()))) {
+    const d = new Date(this.date);
+    if (!isNaN(d.getTime())) this.auditDate = d;
+  }
+});
 
 const assetDisposalSchema = new mongoose.Schema(
   {

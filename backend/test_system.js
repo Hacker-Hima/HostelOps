@@ -80,7 +80,7 @@ async function runTests() {
       { username: 'student1', password: 'user@123' }
     );
     assert(studentLogin.status === 200, 'Student login status 200');
-    assert(studentLogin.body.token && studentLogin.body.user.role === 'user', 'Returns token and role is user');
+    assert(studentLogin.body.token && (studentLogin.body.user.role === 'user' || studentLogin.body.user.role === 'student'), 'Returns token and role is student/user');
     const studentToken = studentLogin.body.token;
 
     // 4. Auth: Negative Test - Wrong Password & Unknown User
@@ -194,7 +194,7 @@ async function runTests() {
     );
     assert(profileUpdate.status === 200, 'Profile updated successfully');
     assert(profileUpdate.body.user.phone === '+91 99999 88888', 'Phone was updated');
-    assert(profileUpdate.body.user.role === 'user', 'Role modification in profile update blocked');
+    assert(profileUpdate.body.user.role === 'user' || profileUpdate.body.user.role === 'student', 'Role modification in profile update blocked');
 
     // 8. Asset Lifecycle & Transfer Bug Verification
     console.log('\n8. Asset Lifecycle & Transfer Bug Fix Verification');
@@ -366,6 +366,234 @@ async function runTests() {
     assert(analytics.body.metrics && typeof analytics.body.metrics.totalAssets === 'number', 'Metrics computed from MongoDB');
     assert(analytics.body.categoryBreakdown && Array.isArray(analytics.body.categoryBreakdown), 'Category breakdown aggregated');
     assert(analytics.body.blockBreakdown && Array.isArray(analytics.body.blockBreakdown), 'Block distribution aggregated');
+
+    // 11. First-Class Room Hierarchy & Digital Twin
+    console.log('\n11. Room Hierarchy & Digital Twin (/api/rooms)');
+    const roomsResp = await request({
+      hostname: 'localhost',
+      port: 5000,
+      path: '/api/rooms',
+      method: 'GET',
+    });
+    assert(roomsResp.status === 200, 'Rooms list endpoint returns 200');
+    assert(Array.isArray(roomsResp.body.rooms) && roomsResp.body.rooms.length > 0, 'Rooms list is populated');
+
+    const dtResp = await request({
+      hostname: 'localhost',
+      port: 5000,
+      path: '/api/rooms/digital-twin/Block%20A',
+      method: 'GET',
+    });
+    assert(dtResp.status === 200, 'Digital Twin endpoint returns 200 for Block A');
+    assert(Array.isArray(dtResp.body.rooms) && dtResp.body.rooms.length > 0, 'Digital twin returns rooms');
+    assert(typeof dtResp.body.rooms[0].maintenanceScore === 'number', 'Room has maintenance score computed');
+
+    // 12. Resident Management & Semester Checkout Inspection
+    console.log('\n12. Resident Management & Semester Checkout Inspection (/api/residents)');
+    const residentsResp = await request({
+      hostname: 'localhost',
+      port: 5000,
+      path: '/api/residents',
+      method: 'GET',
+    });
+    assert(residentsResp.status === 200, 'Residents endpoint returns 200');
+    assert(Array.isArray(residentsResp.body.residents) && residentsResp.body.residents.length > 0, 'Residents populated');
+
+    // Student attempts checkout inspection (must be blocked by RBAC)
+    const unauthorizedCheckout = await request(
+      {
+        hostname: 'localhost',
+        port: 5000,
+        path: '/api/residents/21CS204/checkout',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${studentToken}`,
+        },
+      },
+      {
+        inspectorName: 'Self-inspection',
+        items: [],
+      }
+    );
+    assert(unauthorizedCheckout.status === 403, 'Student cannot perform checkout inspection (403 Forbidden)');
+
+    // Admin performs Semester Checkout Inspection with damage penalty
+    const checkoutResp = await request(
+      {
+        hostname: 'localhost',
+        port: 5000,
+        path: '/api/residents/21CS204/checkout',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+      },
+      {
+        inspectorName: 'Dr. Meena Sharma',
+        items: [
+          { assetTag: 'AST-A204-BED-01', assetName: 'Single Bed Frame', isDamaged: false },
+          { assetTag: 'AST-A204-DSK-01', assetName: 'Study Desk', isDamaged: true, damageDescription: 'Broken drawer', penaltyAmount: 850 },
+        ],
+        remarks: 'Study desk broken by resident.',
+      }
+    );
+    assert(checkoutResp.status === 200, 'Warden performed checkout inspection (200 OK)');
+    assert(checkoutResp.body.inspection.totalPenalty === 850, 'Damage penalty calculated accurately as ₹850');
+    assert(checkoutResp.body.resident.clearanceStatus === 'DamageFlagged', 'Clearance status flagged due to damage');
+
+    // Warden approves clearance
+    const clearanceResp = await request(
+      {
+        hostname: 'localhost',
+        port: 5000,
+        path: '/api/residents/21CS204/clearance',
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+      },
+      {
+        approvalStatus: 'Approved',
+        remarks: 'Penalty paid via mess fees and cleared.',
+      }
+    );
+    assert(clearanceResp.status === 200, 'Warden approved clearance');
+    assert(clearanceResp.body.resident.clearanceStatus === 'Cleared', 'Resident is cleared');
+    assert(clearanceResp.body.resident.status === 'CheckedOut', 'Resident status updated to CheckedOut');
+
+    // 13. AI Operations Copilot Live Reasoning (/api/ai/copilot)
+    console.log('\n13. AI Operations Copilot Live Reasoning (/api/ai/copilot)');
+    const aiDiag = await request(
+      {
+        hostname: 'localhost',
+        port: 5000,
+        path: '/api/ai/copilot',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+      },
+      {
+        message: 'Which technician should be dispatched for urgent geyser short-circuiting in Room A-204?',
+        contextRoom: 'A-204',
+      }
+    );
+    assert(aiDiag.status === 200, 'AI Copilot responds with 200 OK');
+    assert(aiDiag.body.success === true, 'AI returns success status');
+    assert(aiDiag.body.suggestedAction && aiDiag.body.suggestedAction.type === 'ASSIGN_WORKER', 'AI recommends technician dispatch');
+    assert(typeof aiDiag.body.message === 'string' && aiDiag.body.message.includes('Dispatch'), 'AI produces multi-factor reasoning');
+
+    const aiPredict = await request(
+      {
+        hostname: 'localhost',
+        port: 5000,
+        path: '/api/ai/copilot',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+      },
+      {
+        message: 'Predict asset replacement vs repair costs and hostel health score',
+      }
+    );
+    assert(aiPredict.status === 200, 'AI Predict endpoint responds with 200 OK');
+    assert(aiPredict.body.message.includes('Institutional Health Index'), 'AI queries live MongoDB assets and health index');
+
+    // 14. Procurement & Vendor Lifecycle (/api/procurement)
+    console.log('\n14. Procurement & Vendor Lifecycle (/api/procurement)');
+    const vendorsResp = await request({
+      hostname: 'localhost',
+      port: 5000,
+      path: '/api/procurement/vendors',
+      method: 'GET',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert(vendorsResp.status === 200, 'Vendors list returned 200 OK');
+    assert(Array.isArray(vendorsResp.body.data) && vendorsResp.body.data.length >= 3, 'Seeded institutional vendors found');
+    assert(vendorsResp.body.metrics.totalVendors >= 3, 'Vendor scorecard metrics calculated');
+
+    // Create a new Purchase Order
+    const createPoResp = await request(
+      {
+        hostname: 'localhost',
+        port: 5000,
+        path: '/api/procurement/orders',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+      },
+      {
+        title: 'Procurement of High-Capacity Geysers for Block A Bathrooms',
+        vendorId: 'VND-2026-00103',
+        category: 'Plumbing & Sanitation',
+        priority: 'High',
+        items: [
+          {
+            itemName: 'Commercial 50L Storage Geyser',
+            category: 'Plumbing',
+            modelNumber: 'JQ-GEY-50L',
+            quantity: 2,
+            unitPrice: 9500,
+            totalPrice: 19000,
+            targetHostel: 'BH-1',
+            targetBlock: 'Block A',
+            targetRoom: 'Floor 1 Washroom',
+          },
+        ],
+      }
+    );
+    assert(createPoResp.status === 201, 'Purchase Order created (201 Created)');
+    const newPoNumber = createPoResp.body.data.poNumber;
+    assert(newPoNumber.startsWith('PO-'), 'Institutional PO identifier generated');
+    assert(createPoResp.body.data.totalAmount === 19000, 'Total PO amount calculated accurately as ₹19000');
+
+    // Approve the Purchase Order
+    const approvePoResp = await request(
+      {
+        hostname: 'localhost',
+        port: 5000,
+        path: `/api/procurement/orders/${newPoNumber}/status`,
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+      },
+      { status: 'Approved' }
+    );
+    assert(approvePoResp.status === 200, 'Purchase Order approved');
+    assert(approvePoResp.body.data.status === 'Approved', 'PO status is Approved');
+
+    // Process Goods Received & Automatic Asset Registration
+    const receiveResp = await request(
+      {
+        hostname: 'localhost',
+        port: 5000,
+        path: `/api/procurement/orders/${newPoNumber}/receive`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+      },
+      {
+        invoiceNumber: 'INV-2026-9901',
+        receivingNotes: 'Inspected by Chief Warden, all heating elements verified.',
+        conditionCheck: 'Pass',
+      }
+    );
+    assert(receiveResp.status === 200, 'Goods received processed successfully (200 OK)');
+    assert(receiveResp.body.registeredAssetsCount === 2, 'Auto-registered 2 new physical assets into inventory');
+    assert(Array.isArray(receiveResp.body.generatedTags) && receiveResp.body.generatedTags.length === 2, 'Generated institutional asset tags');
+    assert(receiveResp.body.purchaseOrder.status === 'Received', 'PO status transitioned to Received');
 
     console.log(`\n========================================`);
     console.log(`Tests Completed: ${passed + failed} | Passed: ${passed} | Failed: ${failed}`);

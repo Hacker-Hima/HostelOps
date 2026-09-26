@@ -12,6 +12,11 @@ import {
   AuditLog,
   Notification,
   Worker,
+  Room,
+  Hostel,
+  Resident,
+  Vendor,
+  PurchaseOrder,
 } from '../models/index.js';
 
 dotenv.config();
@@ -114,16 +119,9 @@ export async function connectDB() {
  */
 async function checkAndSeedData() {
   try {
-    const shouldSeed = process.env.SEED_DATABASE === 'true';
-    const userCount = await User.countDocuments();
-
-    if (shouldSeed || userCount === 0) {
-      console.log('🌱 Initializing or refreshing Hostel Asset Management System seed data...');
-      await seedInitialData();
-    } else {
-      console.log(`ℹ️ Database already initialized (${userCount} users found). Verifying credentials...`);
-      await ensureDefaultPasswords();
-    }
+    console.log('🌱 Verifying seed data and institutional records...');
+    await seedInitialData();
+    await ensureDefaultPasswords();
   } catch (err) {
     console.error('Seeding check error:', err.message);
   }
@@ -279,9 +277,22 @@ export async function seedInitialData() {
     ];
 
     for (const u of initialUsers) {
-      const existing = await User.findOne({ username: u.username });
+      const query = u.id ? { $or: [{ username: u.username }, { id: u.id }] } : { username: u.username };
+      const existing = await User.findOne(query).select('+password');
       if (!existing) {
         await User.create(u);
+      } else {
+        let changed = false;
+        if (!existing.username) { existing.username = u.username; changed = true; }
+        if (!existing.password) { existing.password = u.password; changed = true; }
+        if (!existing.name) { existing.name = u.name; changed = true; }
+        if (!existing.initials) { existing.initials = u.initials; changed = true; }
+        if (!existing.roll_number) { existing.roll_number = u.roll_number; changed = true; }
+        if (!existing.phone) { existing.phone = u.phone; changed = true; }
+        if (!existing.email) { existing.email = u.email; changed = true; }
+        if (changed) {
+          await existing.save();
+        }
       }
     }
 
@@ -545,7 +556,274 @@ export async function seedInitialData() {
       }
     }
 
-    console.log('✅ HostelOps database seed check complete.');
+    // 6. Seed Hostel & Rooms
+    const existingHostel = await Hostel.findOne({ code: 'BH-1' });
+    if (!existingHostel) {
+      await Hostel.create({
+        name: 'Boys Hostel 1',
+        code: 'BH-1',
+        campus: 'Main Campus',
+        chiefWarden: 'Dr. K. Sundaram',
+        blocks: [
+          { name: 'Block A', totalFloors: 4, roomsCount: 24, supervisor: 'Sarathi Kamal' },
+          { name: 'Block B', totalFloors: 4, roomsCount: 24, supervisor: 'Selvam R.' },
+          { name: 'Block C', totalFloors: 4, roomsCount: 24, supervisor: 'Dhariq Anwar' },
+        ],
+        totalCapacity: 350,
+        currentOccupancy: 280,
+        overallHealthIndex: 94,
+      });
+    }
+
+    const initialRooms = [
+      {
+        roomNumber: '204',
+        block: 'Block A',
+        floor: 'Floor 2',
+        floorNumber: 2,
+        roomType: 'Double',
+        capacity: 2,
+        occupancy: 1,
+        status: 'Optimal',
+        maintenanceScore: 95,
+        beds: [
+          { bedNumber: 'Bed-1', status: 'Occupied', residentRoll: '21CS204', residentName: 'Himachalam' },
+          { bedNumber: 'Bed-2', status: 'Available' },
+        ],
+      },
+      {
+        roomNumber: '102',
+        block: 'Block B',
+        floor: 'Floor 1',
+        floorNumber: 1,
+        roomType: 'Double',
+        capacity: 2,
+        occupancy: 1,
+        status: 'Optimal',
+        maintenanceScore: 92,
+        beds: [
+          { bedNumber: 'Bed-1', status: 'Occupied', residentRoll: '22EC102', residentName: 'Priya Sharma' },
+          { bedNumber: 'Bed-2', status: 'Available' },
+        ],
+      },
+      {
+        roomNumber: '112',
+        block: 'Block A',
+        floor: 'Floor 1',
+        floorNumber: 1,
+        roomType: 'Double',
+        capacity: 2,
+        occupancy: 1,
+        status: 'Attention',
+        maintenanceScore: 78,
+        beds: [
+          { bedNumber: 'Bed-1', status: 'Occupied', residentRoll: '21IT112', residentName: 'Naveen Kumar' },
+          { bedNumber: 'Bed-2', status: 'Available' },
+        ],
+      },
+      {
+        roomNumber: '305',
+        block: 'Block C',
+        floor: 'Floor 3',
+        floorNumber: 3,
+        roomType: 'Double',
+        capacity: 2,
+        occupancy: 1,
+        status: 'Optimal',
+        maintenanceScore: 98,
+        beds: [
+          { bedNumber: 'Bed-1', status: 'Occupied', residentRoll: '23ME305', residentName: 'Devansh Chouhan' },
+          { bedNumber: 'Bed-2', status: 'Available' },
+        ],
+      },
+    ];
+
+    for (const rm of initialRooms) {
+      const existing = await Room.findOne({ roomNumber: rm.roomNumber, block: rm.block });
+      if (!existing) {
+        await Room.create(rm);
+      }
+    }
+
+    // 7. Seed Residents
+    const initialResidents = [
+      {
+        residentId: 'RES-2026-00101',
+        rollNumber: '21CS204',
+        name: 'Himachalam',
+        email: 'hima@hostel.edu',
+        phone: '+91 98765 43210',
+        department: 'Computer Science',
+        year: 3,
+        block: 'Block A',
+        floor: 'Floor 2',
+        roomNumber: '204',
+        bedNumber: 'Bed-1',
+        status: 'Active',
+        clearanceStatus: 'Cleared',
+        assignedAssets: ['AST-A204-BED-01', 'AST-A204-DSK-01', 'AST-A204-FAN-01'],
+      },
+      {
+        residentId: 'RES-2026-00102',
+        rollNumber: '22EC102',
+        name: 'Priya Sharma',
+        email: 'priya@hostel.edu',
+        phone: '+91 98765 43211',
+        department: 'Electronics',
+        year: 2,
+        block: 'Block B',
+        floor: 'Floor 1',
+        roomNumber: '102',
+        bedNumber: 'Bed-1',
+        status: 'Active',
+        clearanceStatus: 'Cleared',
+        assignedAssets: ['AST-B102-AC-01'],
+      },
+      {
+        residentId: 'RES-2026-00103',
+        rollNumber: '21IT112',
+        name: 'Naveen Kumar',
+        email: 'naveen@hostel.edu',
+        phone: '+91 98765 43212',
+        department: 'Information Tech',
+        year: 3,
+        block: 'Block A',
+        floor: 'Floor 1',
+        roomNumber: '112',
+        bedNumber: 'Bed-1',
+        status: 'Active',
+        clearanceStatus: 'Cleared',
+        assignedAssets: ['AST-A112-CHR-01'],
+      },
+      {
+        residentId: 'RES-2026-00104',
+        rollNumber: '23ME305',
+        name: 'Devansh Chouhan',
+        email: 'devansh@hostel.edu',
+        phone: '+91 98765 43213',
+        department: 'Mechanical',
+        year: 1,
+        block: 'Block C',
+        floor: 'Floor 3',
+        roomNumber: '305',
+        bedNumber: 'Bed-1',
+        status: 'Active',
+        clearanceStatus: 'Cleared',
+        assignedAssets: [],
+      },
+    ];
+
+    for (const res of initialResidents) {
+      const existing = await Resident.findOne({ rollNumber: res.rollNumber });
+      if (!existing) {
+        await Resident.create(res);
+      }
+    }
+
+    // Seed Institutional Vendors
+    const initialVendors = [
+      {
+        vendorId: 'VND-2026-00101',
+        name: 'Apex HVAC Solutions Pvt Ltd',
+        category: 'HVAC & Cooling',
+        contactPerson: 'Rajesh Mehra',
+        email: 'service@apexhvac.com',
+        phone: '+91 98111 22334',
+        gstNumber: '07AAAAA0000A1Z5',
+        address: 'Sector 62, Noida, NCR, India',
+        rating: 4.8,
+        slaCompliance: 98.2,
+        ordersCount: 4,
+        totalSpend: 245000,
+        status: 'Active',
+        notes: 'Primary AMC partner for Daikin & Voltas VRV/split systems.',
+        catalog: [
+          { itemName: 'Daikin 1.5T 5-Star Split AC', category: 'HVAC', unitPrice: 42000, leadTimeDays: 5, warrantyMonths: 24 },
+          { itemName: 'Voltas 1.5T Inverter AC', category: 'HVAC', unitPrice: 38000, leadTimeDays: 4, warrantyMonths: 12 },
+        ],
+      },
+      {
+        vendorId: 'VND-2026-00102',
+        name: 'Godrej Interio Institutional',
+        category: 'Furniture & Woodwork',
+        contactPerson: 'Sanjay Dutt',
+        email: 'institutional@godrejinterio.com',
+        phone: '+91 98222 33445',
+        gstNumber: '27AAAAA1111B2Z3',
+        address: 'Vikhroli West, Mumbai, MH, India',
+        rating: 4.6,
+        slaCompliance: 95.0,
+        ordersCount: 3,
+        totalSpend: 180000,
+        status: 'Active',
+        notes: 'High-durability hostel modular study tables and steel bunker beds.',
+        catalog: [
+          { itemName: 'Ergonomic Steel Frame Study Desk', category: 'Furniture', unitPrice: 4500, leadTimeDays: 10, warrantyMonths: 36 },
+          { itemName: 'Heavy Duty Metal Bed Frame', category: 'Furniture', unitPrice: 7800, leadTimeDays: 14, warrantyMonths: 60 },
+        ],
+      },
+      {
+        vendorId: 'VND-2026-00103',
+        name: 'Jaquar Commercial Sanitation',
+        category: 'Plumbing & Sanitation',
+        contactPerson: 'Kavita Singh',
+        email: 'projects@jaquar.com',
+        phone: '+91 98444 55667',
+        gstNumber: '06BBBBB2222C3Z1',
+        address: 'Manesar Industrial Area, Gurgaon, HR, India',
+        rating: 4.9,
+        slaCompliance: 99.0,
+        ordersCount: 5,
+        totalSpend: 110000,
+        status: 'Active',
+        notes: 'Brass fixtures, commercial instant water geysers and pressure pumps.',
+        catalog: [
+          { itemName: 'Commercial 50L Storage Geyser', category: 'Plumbing', unitPrice: 9500, leadTimeDays: 3, warrantyMonths: 24 },
+          { itemName: 'Heavy Brass Dual Flow Sensor Tap', category: 'Plumbing', unitPrice: 3200, leadTimeDays: 3, warrantyMonths: 12 },
+        ],
+      },
+    ];
+
+    for (const v of initialVendors) {
+      const existing = await Vendor.findOne({ vendorId: v.vendorId });
+      if (!existing) {
+        await Vendor.create(v);
+      }
+    }
+
+    // Seed Sample Institutional Purchase Order
+    const poExists = await PurchaseOrder.findOne({ poNumber: 'PO-2026-00101' });
+    if (!poExists) {
+      await PurchaseOrder.create({
+        poNumber: 'PO-2026-00101',
+        title: 'Batch Procurement of 4 Daikin 1.5T Split ACs for Block B North Wing',
+        vendorId: 'VND-2026-00101',
+        vendorName: 'Apex HVAC Solutions Pvt Ltd',
+        category: 'HVAC & Cooling',
+        priority: 'High',
+        status: 'Approved',
+        requestedBy: 'Campus Facility Director',
+        approvedBy: 'Chief Warden',
+        approvalDate: new Date(),
+        totalAmount: 168000,
+        items: [
+          {
+            itemName: 'Daikin 1.5T 5-Star Split AC',
+            category: 'Air Conditioning',
+            modelNumber: 'FTKM50',
+            quantity: 4,
+            unitPrice: 42000,
+            totalPrice: 168000,
+            specifications: 'Copper Condenser, PM 2.5 Filter, 5-Star BEE',
+            targetHostel: 'BH-1',
+            targetBlock: 'Block B',
+            targetRoom: 'Room 201',
+          },
+        ],
+      });
+    }
+
+    console.log('✅ HostelOps database seed check complete (Hostels, Rooms, Residents, Vendors, POs initialized).');
   } catch (error) {
     console.error('❌ MongoDB Seeding Error:', error.message);
   }

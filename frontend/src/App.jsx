@@ -11,6 +11,7 @@ import {
   markAllNotificationsReadAsync,
   markNotificationReadAsync,
   setSettingsModalOpen,
+  setCheckoutModalOpen,
   addToast,
 } from './redux/ticketSlice';
 
@@ -31,6 +32,8 @@ import RequestAssetModal from './components/RequestAssetModal';
 import QrPreviewModal from './components/QrPreviewModal';
 import QrScannerModal from './components/QrScannerModal';
 import SettingsModal from './components/SettingsModal';
+import SemesterCheckoutModal from './components/SemesterCheckoutModal';
+import ProcurementManagerModal from './components/ProcurementManagerModal';
 import ToastHost from './components/ToastHost';
 
 import './index.css';
@@ -50,10 +53,12 @@ export default function App() {
     isBackendConnected,
     dbStatus,
     connectionError,
+    checkoutModalOpen,
   } = useSelector((s) => s.ticketStore);
 
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [showProcurement, setShowProcurement] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.isRead && !n.is_read).length;
 
@@ -333,6 +338,30 @@ export default function App() {
                 )}
               </div>
 
+              {/* Procurement Hub (Admin/Staff/Warden) */}
+              {currentRole !== 'user' && (
+                <button
+                  onClick={() => setShowProcurement(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '7px 14px',
+                    borderRadius: '10px',
+                    background: 'rgba(99, 102, 241, 0.12)',
+                    border: '1px solid rgba(99, 102, 241, 0.35)',
+                    color: '#818cf8',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                  }}
+                  title="Procurement, Purchase Orders & Vendor Scorecards"
+                >
+                  <span>📦</span>
+                  <span>Procurement</span>
+                </button>
+              )}
+
               {/* Settings Button (Only visible when logged in) */}
               <button
                 onClick={() => setShowSettings(true)}
@@ -495,6 +524,12 @@ export default function App() {
       <QrPreviewModal />
       <QrScannerModal />
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      <SemesterCheckoutModal isOpen={checkoutModalOpen} onClose={() => dispatch(setCheckoutModalOpen(false))} />
+      <ProcurementManagerModal
+        isOpen={showProcurement}
+        onClose={() => setShowProcurement(false)}
+        onAssetCreated={() => dispatch(fetchInitialData())}
+      />
 
       {/* ══ Global Toast Alerts ══ */}
       <ToastHost />

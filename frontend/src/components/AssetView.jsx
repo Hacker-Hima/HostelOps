@@ -1117,6 +1117,66 @@ export default function AssetView({ page, isMobile }) {
               </div>
             </div>
 
+            {/* Institutional TCO & Lifecycle Analysis */}
+            {(() => {
+              const pCost = selectedAsset.purchaseCost || selectedAsset.value || selectedAsset.purchase_cost || 1000;
+              const maintHistory = selectedAsset.maintenanceHistory || [];
+              const estimatedMaintSpend = maintHistory.length * 1250;
+              const tcoRatio = Math.round((estimatedMaintSpend / pCost) * 100);
+              const isHighTco = tcoRatio >= 50;
+
+              return (
+                <div
+                  style={{
+                    marginBottom: 16,
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    background: isHighTco ? 'rgba(239, 68, 68, 0.08)' : 'rgba(99, 102, 241, 0.08)',
+                    border: `1px solid ${isHighTco ? 'rgba(239, 68, 68, 0.3)' : 'rgba(99, 102, 241, 0.25)'}`,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
+                      📊 Total Cost of Ownership (TCO) & Replacement Score
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        background: isHighTco ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                        color: isHighTco ? '#ef4444' : '#10b981',
+                      }}
+                    >
+                      {isHighTco ? '⚠️ Replace Recommended' : '✅ Optimal Lifecycle'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, fontSize: 11, textAlign: 'center', margin: '6px 0' }}>
+                    <div style={{ background: 'var(--bg-glass)', padding: 6, borderRadius: 6 }}>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>Original Cost</div>
+                      <div style={{ fontWeight: 700 }}>₹{pCost.toLocaleString()}</div>
+                    </div>
+                    <div style={{ background: 'var(--bg-glass)', padding: 6, borderRadius: 6 }}>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>Maint. Spend</div>
+                      <div style={{ fontWeight: 700, color: isHighTco ? '#ef4444' : '#f59e0b' }}>₹{estimatedMaintSpend.toLocaleString()}</div>
+                    </div>
+                    <div style={{ background: 'var(--bg-glass)', padding: 6, borderRadius: 6 }}>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>Repair/Value Ratio</div>
+                      <div style={{ fontWeight: 700, color: isHighTco ? '#ef4444' : '#10b981' }}>{tcoRatio}%</div>
+                    </div>
+                  </div>
+
+                  {isHighTco && (
+                    <div style={{ fontSize: 10, color: '#f87171', marginTop: 4, lineHeight: 1.3 }}>
+                      Cumulative repairs have reached {tcoRatio}% of asset cost. Institutional 50% replacement threshold breached. Recommend initiation of PO in Procurement Hub.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button className="btn btn-secondary btn-sm" onClick={() => setSelectedAssetTag(null)}>
                 Close

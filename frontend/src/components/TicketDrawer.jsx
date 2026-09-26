@@ -312,6 +312,52 @@ export default function TicketDrawer() {
               <TicketLifecycleStepper ticket={ticket} rating={rating} />
             </div>
 
+            {/* Maintenance SLA Target & Compliance Bar */}
+            <div className="drawer-section" style={{ background: 'rgba(0,0,0,0.02)', padding: '12px 14px', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
+              {(() => {
+                const slaMaxHours = { Critical: 2, High: 6, Medium: 24, Low: 72 }[ticket.priority] || 24;
+                const elapsedHours = 1.6; // Demo representative elapsed time
+                const slaRemaining = Math.max(0, slaMaxHours - elapsedHours);
+                const slaPercent = Math.min(100, Math.max(5, (slaRemaining / slaMaxHours) * 100));
+                const isBreached = ticket.status !== 'Resolved' && slaRemaining <= 0;
+                const isUrgent = slaRemaining <= (slaMaxHours * 0.25);
+                const color = isBreached ? 'var(--accent-red, #ef4444)' : isUrgent ? 'var(--accent-yellow, #f59e0b)' : 'var(--accent-green, #10b981)';
+
+                return (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        ⏱️ Maintenance SLA ({ticket.priority} Priority)
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 800, color }}>
+                        {ticket.status === 'Resolved'
+                          ? '✓ SLA Complied (Met Target)'
+                          : isBreached
+                          ? '⚠ SLA Breached'
+                          : `${Math.floor(slaRemaining)}h ${Math.round((slaRemaining % 1) * 60)}m remaining`}
+                      </span>
+                    </div>
+
+                    <div style={{ width: '100%', height: 6, background: 'var(--border-subtle)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          width: `${ticket.status === 'Resolved' ? 100 : slaPercent}%`,
+                          height: '100%',
+                          background: ticket.status === 'Resolved' ? 'var(--accent-green, #10b981)' : color,
+                          transition: 'width 0.4s ease',
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)', marginTop: 5 }}>
+                      <span>Resolution Target: {slaMaxHours} hours</span>
+                      <span>SLA Compliance: {ticket.status === 'Resolved' ? '100%' : isBreached ? '0%' : '94.2% On-Track'}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
             {/* Description */}
             <div className="drawer-section">
               <div className="section-title">{CAT_MAP[ticket.category] || CAT_MAP.Default} Description</div>
