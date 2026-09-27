@@ -361,11 +361,11 @@ export default function AssetView({ page, isMobile }) {
       <div
         style={{
           display: 'flex',
+          flexWrap: 'wrap',
           gap: 8,
           marginBottom: 20,
           borderBottom: '1px solid var(--border-subtle)',
           paddingBottom: 12,
-          overflowX: 'auto',
         }}
       >
         {[
@@ -1066,7 +1066,7 @@ export default function AssetView({ page, isMobile }) {
                 <div>▄▄▄▄▄ ▄▄▄ </div>
                 <div>███████ █ </div>
                 <div>█ ▄▄▄ █ ▄▄</div>
-                <div style={{ fontSize: 6, marginTop: 3, color: '#00ffff' }}>{selectedAsset.tag}</div>
+                <div style={{ fontSize: 6, marginTop: 3, color: '#60a5fa' }}>{selectedAsset.tag}</div>
               </div>
 
               <div style={{ minWidth: 0, flex: 1 }}>

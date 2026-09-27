@@ -9,15 +9,14 @@ import {
 import { useTranslation } from '../utils/translations';
 
 const COLOR_THEMES = [
-  { id: 'purple', label: 'Indigo',  grad: 'linear-gradient(135deg,#7c3aed,#4f46e5)', dot: '#7c3aed' },
-  { id: 'cyan',   label: 'Aqua',   grad: 'linear-gradient(135deg,#06b6d4,#3b82f6)', dot: '#06b6d4' },
-  { id: 'green',  label: 'Emerald',grad: 'linear-gradient(135deg,#10b981,#059669)', dot: '#10b981' },
-  { id: 'orange', label: 'Amber',  grad: 'linear-gradient(135deg,#f97316,#eab308)', dot: '#f97316' },
-  { id: 'red',    label: 'Rose',   grad: 'linear-gradient(135deg,#ef4444,#ec4899)', dot: '#ef4444' },
-  { id: 'pink',   label: 'Blush',  grad: 'linear-gradient(135deg,#ec4899,#8b5cf6)', dot: '#ec4899' },
-  { id: 'cyber',  label: 'Matrix', grad: 'linear-gradient(135deg,#00ffc8,#7928ca)', dot: '#00ffc8' },
-  { id: 'gold',   label: 'Gold',   grad: 'linear-gradient(135deg,#f59e0b,#fbbf24)', dot: '#f59e0b' },
-  { id: 'frost',  label: 'Frost',  grad: 'linear-gradient(135deg,#38bdf8,#818cf8)', dot: '#38bdf8' },
+  { id: 'corporate', label: 'Corporate Blue', grad: 'linear-gradient(135deg,#1d4ed8,#2563eb)', dot: '#2563eb' },
+  { id: 'slate',     label: 'Slate Steel',    grad: 'linear-gradient(135deg,#334155,#475569)', dot: '#475569' },
+  { id: 'teal',      label: 'Nordic Teal',    grad: 'linear-gradient(135deg,#0f766e,#0d9488)', dot: '#0d9488' },
+  { id: 'emerald',   label: 'Emerald Green',  grad: 'linear-gradient(135deg,#047857,#059669)', dot: '#059669' },
+  { id: 'indigo',    label: 'Deep Indigo',    grad: 'linear-gradient(135deg,#4338ca,#4f46e5)', dot: '#4f46e5' },
+  { id: 'amber',     label: 'Executive Amber',grad: 'linear-gradient(135deg,#b45309,#d97706)', dot: '#d97706' },
+  { id: 'crimson',   label: 'Classic Crimson',grad: 'linear-gradient(135deg,#991b1b,#be123c)', dot: '#be123c' },
+  { id: 'cobalt',    label: 'Cobalt Navy',    grad: 'linear-gradient(135deg,#1e3a8a,#1e40af)', dot: '#1e40af' },
 ];
 
 const LANGUAGES = [
@@ -76,7 +75,7 @@ export default function SettingsModal({ isOpen, onClose }) {
 
   const handleReset = () => {
     dispatch(setThemeMode('light'));
-    dispatch(setColorTheme('cyan'));
+    dispatch(setColorTheme('corporate'));
     dispatch(setRadiusMode('smooth'));
     dispatch(setFontStyle('inter'));
     dispatch(setFontSize('normal'));

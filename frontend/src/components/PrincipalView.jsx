@@ -39,7 +39,7 @@ function PrincipalDashboard({ tickets, staffRequests, budget, ticketVolume7d, ti
         </div>
         <div style={{display:'flex',alignItems:'center',gap:12}}>
           <div style={{fontSize:11,color:'var(--text-muted)'}}>Academic Year 2025-26</div>
-          <div className="avatar" style={{background:'linear-gradient(135deg,#ef4444,#ec4899)',width:38,height:38,fontSize:16}}>👑</div>
+          <div className="avatar" style={{background:'var(--grad-primary)',width:38,height:38,fontSize:16}}>👑</div>
         </div>
       </div>
 
@@ -71,8 +71,8 @@ function PrincipalDashboard({ tickets, staffRequests, budget, ticketVolume7d, ti
             data={timeRange==='7d' ? (ticketVolume7d || [3, 5, 2, 8, 4, 6, 7]) : (ticketVolume30d || [12, 9, 15, 8, 11, 14, 10, 7, 9, 13, 11, 8, 6, 10, 12, 15, 9, 8, 11, 14, 10, 7, 9, 13, 11, 8, 6, 10, 12, 15])}
             width={380}
             height={80}
-            color="var(--accent-red)"
-            gradient={['#ef4444', '#ec4899']}
+            color="var(--accent-primary)"
+            gradient={['#1d4ed8', '#2563eb']}
             showDots={timeRange==='7d'}
           />
         </div>
@@ -86,8 +86,8 @@ function PrincipalDashboard({ tickets, staffRequests, budget, ticketVolume7d, ti
             data={budgetBurn7d || [310000, 318000, 322000, 328000, 332000, 337000, 340000]}
             width={380}
             height={80}
-            color="var(--accent-cyan)"
-            gradient={['#06b6d4', '#3b82f6']}
+            color="var(--accent-green)"
+            gradient={['#047857', '#059669']}
             showDots
           />
         </div>
@@ -100,7 +100,7 @@ function PrincipalDashboard({ tickets, staffRequests, budget, ticketVolume7d, ti
           <svg width={130} height={130} viewBox="0 0 130 130" style={{ margin:'10px 0' }}>
             <circle cx={65} cy={65} r={radius} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={12}/>
             <circle cx={65} cy={65} r={radius} fill="none" stroke="url(#pg1)" strokeWidth={12} strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ*(1-utilizationPct/100)} transform="rotate(-90 65 65)" style={{transition:'stroke-dashoffset 1.5s ease'}}/>
-            <defs><linearGradient id="pg1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#ef4444"/><stop offset="100%" stopColor="#ec4899"/></linearGradient></defs>
+            <defs><linearGradient id="pg1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#1d4ed8"/><stop offset="100%" stopColor="#2563eb"/></linearGradient></defs>
             <text x={65} y={60} textAnchor="middle" fill="#f0f4ff" fontSize={20} fontWeight={800} fontFamily="Inter,sans-serif">{utilizationPct}%</text>
             <text x={65} y={78} textAnchor="middle" fill="#94a3b8" fontSize={10} fontFamily="Inter,sans-serif">{t('budget_used', 'Utilized')}</text>
           </svg>
@@ -335,7 +335,7 @@ export default function PrincipalView({ page, isMobile }) {
             onClick={() => dispatch(setProfileModalOpen(true))}
             title="Click to view & edit profile details"
           >
-            <div className="sidebar-profile-avatar" style={{ background: 'linear-gradient(135deg, #ef4444, #ec4899)' }}>KS</div>
+            <div className="sidebar-profile-avatar" style={{ background: 'var(--grad-primary)' }}>KS</div>
             <div className="sidebar-profile-meta">
               <span className="sidebar-profile-title">Dr. K. Sundaram</span>
               <span className="sidebar-profile-subtitle">{t('role_principal', 'Principal')} • Executive Suite</span>

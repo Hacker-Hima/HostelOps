@@ -44,6 +44,29 @@ export default function StudentDashboard({ isMobile }) {
     );
   }, [assetRequests, currentUser]);
 
+  // Recently Accessed Quick Items
+  const [recentlyAccessed, setRecentlyAccessed] = useState(() => {
+    try {
+      const saved = localStorage.getItem('hostelops_recent_student');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [
+      { id: 'AST-FUR-101', type: 'asset', icon: '🪑', title: 'Study Desk', subtitle: 'Room Assigned' },
+      { id: 'AST-APP-102', type: 'asset', icon: '❄️', title: 'Ceiling Fan', subtitle: 'Room Assigned' },
+      { id: 'AST-FUR-103', type: 'asset', icon: '🛏️', title: 'Spring Cot Bed', subtitle: 'Room Assigned' },
+      { id: 'REQ-101', type: 'tab', target: 'requests', icon: '📋', title: 'LAN Cable', subtitle: 'Request Status' },
+    ];
+  });
+
+  const handleRecentClick = (item) => {
+    if (item.type === 'asset') {
+      dispatch(setSelectedAssetTag(item.id));
+      dispatch(setQrPreviewTag(item.id));
+    } else if (item.type === 'tab') {
+      setActiveSubTab(item.target);
+    }
+  };
+
   return (
     <div style={{ padding: '16px 20px', maxWidth: '1440px', width: '100%', marginInline: 'auto', boxSizing: 'border-box', overflowX: 'hidden' }}>
       
@@ -66,16 +89,16 @@ export default function StudentDashboard({ isMobile }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
           <div
             style={{
-              width: '60px',
-              height: '60px',
-              borderRadius: '16px',
-              background: 'linear-gradient(135deg, #06b6d4, #3b82f6)',
+              width: '56px',
+              height: '56px',
+              borderRadius: '14px',
+              background: 'var(--grad-primary)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '28px',
+              fontSize: '26px',
               color: '#fff',
-              boxShadow: '0 8px 20px rgba(6, 182, 212, 0.35)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
             }}
           >
             🎓
@@ -91,9 +114,9 @@ export default function StudentDashboard({ isMobile }) {
                   fontWeight: 700,
                   padding: '3px 10px',
                   borderRadius: '50px',
-                  background: 'rgba(6, 182, 212, 0.15)',
-                  color: '#06b6d4',
-                  border: '1px solid rgba(6, 182, 212, 0.3)',
+                  background: 'var(--accent-primary-soft)',
+                  color: 'var(--text-accent)',
+                  border: '1px solid var(--border-strong)',
                 }}
               >
                 Roll: {currentUser?.roll_number}
@@ -165,6 +188,55 @@ export default function StudentDashboard({ isMobile }) {
             <span>Return / Vacate</span>
           </button>
         </div>
+      </div>
+
+      {/* 🕒 Recently Accessed Quick Access Strip */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          overflowX: 'auto',
+          padding: '8px 14px',
+          marginBottom: '16px',
+          background: 'var(--bg-surface)',
+          borderRadius: '10px',
+          border: '1px solid var(--border-default)',
+        }}
+      >
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <span>🕒</span>
+          <span>Recently Accessed:</span>
+        </span>
+        {recentlyAccessed.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => handleRecentClick(item)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-subtle)',
+              fontSize: '11px',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--accent-primary)')}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border-subtle)')}
+          >
+            <span>{item.icon}</span>
+            <span>{item.title}</span>
+            <span style={{ fontSize: '9.5px', color: 'var(--text-muted)', background: 'var(--accent-primary-soft)', padding: '1px 5px', borderRadius: '4px' }}>
+              {item.subtitle}
+            </span>
+          </button>
+        ))}
       </div>
 
       {/* Navigation Sub-Tabs */}

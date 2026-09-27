@@ -103,10 +103,10 @@ function TechnicianFeed({ jobs, onViewJob, completedIds, onOpenDrawer, t }) {
       )}
 
       {/* Earnings Card */}
-      <div style={{background:'linear-gradient(135deg,rgba(124,58,237,0.15),rgba(6,182,212,0.08))',border:'1px solid var(--border-default)',borderRadius:'var(--radius-lg)',padding:'14px 16px',marginTop:14}}>
+      <div style={{background:'var(--accent-primary-soft)',border:'1px solid var(--border-strong)',borderRadius:'var(--radius-lg)',padding:'14px 16px',marginTop:14}}>
         <div style={{fontSize:10,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:8}}>{t('earnings', 'Earnings Performance')}</div>
         <div style={{display:'flex',justifyContent:'space-between'}}>
-          <div><div style={{fontSize:20,fontWeight:800,color:'var(--accent-cyan)'}}>18</div><div style={{fontSize:10,color:'var(--text-muted)'}}>Jobs Done</div></div>
+          <div><div style={{fontSize:20,fontWeight:800,color:'var(--accent-primary)'}}>18</div><div style={{fontSize:10,color:'var(--text-muted)'}}>Jobs Done</div></div>
           <div><div style={{fontSize:20,fontWeight:800,color:'var(--accent-green)'}}>₹9,200</div><div style={{fontSize:10,color:'var(--text-muted)'}}>{t('earnings', 'Earnings')}</div></div>
           <div><div style={{fontSize:20,fontWeight:800,color:'var(--accent-yellow)'}}>4.8⭐</div><div style={{fontSize:10,color:'var(--text-muted)'}}>Rating</div></div>
         </div>

@@ -34,7 +34,7 @@ const ROLE_META = {
     clearance: 'Level 4 · Fiscal Approval Authority',
     dept: 'Administration & Budget Office',
     permissions: ['Budget Expense Sign-Off', 'Incident Audit Log Review', 'Staff Requisition Approval'],
-    color: '#ec4899',
+    color: 'var(--accent-primary)',
   },
   technician: {
     label: 'Field Technician',

@@ -152,7 +152,7 @@ export default function AllocateAssetModal() {
               marginTop: '8px',
               padding: '12px',
               borderRadius: '10px',
-              background: '#06b6d4',
+              background: 'var(--accent-primary)',
               border: 'none',
               color: '#fff',
               fontWeight: 700,

@@ -13,12 +13,14 @@ import {
   setSettingsModalOpen,
   setCheckoutModalOpen,
   addToast,
+  setLanguage,
 } from './redux/ticketSlice';
 
 /* ── Role Views ── */
 import LoginPage from './components/LoginPage';
 import AdminDashboard from './components/AdminDashboard';
 import StudentDashboard from './components/StudentDashboard';
+import HostelBotAI from './components/HostelBotAI';
 
 /* ── Lifecycle Modals & Global Overlays ── */
 import AddAssetModal from './components/AddAssetModal';
@@ -59,6 +61,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showProcurement, setShowProcurement] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.isRead && !n.is_read).length;
 
@@ -97,7 +100,10 @@ export default function App() {
   }, [themeMode]);
 
   useEffect(() => {
-    const allThemes = ['purple', 'cyan', 'green', 'orange', 'red', 'pink', 'cyber', 'gold', 'frost'];
+    const allThemes = [
+      'corporate', 'blue', 'slate', 'teal', 'emerald', 'indigo', 'amber', 'crimson', 'cobalt',
+      'purple', 'cyan', 'green', 'orange', 'red', 'pink', 'cyber', 'gold', 'frost'
+    ];
     allThemes.forEach((th) => document.body.classList.remove(`color-${th}`));
     document.body.classList.add(`color-${colorTheme}`);
   }, [colorTheme]);
@@ -123,6 +129,11 @@ export default function App() {
       case 'admin':
       case 'staff':
       case 'technician':
+      case 'warden':
+      case 'asst_warden':
+      case 'reswarden':
+      case 'res_warden':
+      case 'principal':
         return <AdminDashboard isMobile={false} />;
       case 'user':
       case 'student':
@@ -133,7 +144,7 @@ export default function App() {
   }, [currentRole]);
 
   return (
-    <div className="hostelops-root" style={{ minHeight: '100vh', width: '100%', maxWidth: '100vw', overflowX: 'hidden', background: 'var(--bg-root)', color: 'var(--text-primary)' }}>
+    <div className="hostelops-root" style={{ minHeight: '100vh', width: '100%', maxWidth: '100vw', overflowX: 'hidden', background: 'transparent', color: 'var(--text-primary)' }}>
       
       {/* ══ Top Navigation Bar ══ */}
       <header
@@ -161,14 +172,14 @@ export default function App() {
             style={{
               width: '36px',
               height: '36px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #0284c7, #38bdf8)',
+              borderRadius: '9px',
+              background: 'var(--grad-primary)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '18px',
               color: '#fff',
-              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
+              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
             }}
           >
             🏢
@@ -182,53 +193,6 @@ export default function App() {
             </div>
           </div>
         </div>
-
-        {/* Active Session Identity Badge */}
-        {currentRole !== 'login' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '6px 14px',
-                borderRadius: '50px',
-                background: 'var(--accent-primary-soft)',
-                border: '1px solid var(--border-strong)',
-              }}
-            >
-              <span style={{ fontSize: '14px' }}>
-                {currentRole === 'admin'
-                  ? (adminType === 'superadmin' ? '👑' : '🛡️')
-                  : (currentRole === 'staff' || currentRole === 'technician')
-                  ? '⚡'
-                  : '🎓'}
-              </span>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                {currentRole === 'admin'
-                  ? adminType === 'superadmin'
-                    ? 'Super Admin (Admin 1)'
-                    : 'Asset Admin (Admin 2)'
-                  : (currentRole === 'staff' || currentRole === 'technician')
-                  ? `Staff (${currentUser?.name || 'Technician'})`
-                  : `Student (${currentUser?.name || 'Student'})`}
-              </span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>•</span>
-              <span style={{ fontSize: '11px', color: 'var(--text-accent)', fontWeight: 600 }}>
-                {currentUser?.room ? `Room ${currentUser.room}` : currentUser?.name}
-              </span>
-              <span
-                style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  background: '#10b981',
-                  display: 'inline-block',
-                }}
-              />
-            </div>
-          </div>
-        )}
 
         {/* Right Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -361,6 +325,55 @@ export default function App() {
                   <span>Procurement</span>
                 </button>
               )}
+
+              {/* AI Assistant Button */}
+              <button
+                onClick={() => setAiOpen(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 14px',
+                  borderRadius: '10px',
+                  background: 'var(--accent-primary-soft)',
+                  border: '1px solid rgba(37, 99, 235, 0.3)',
+                  color: 'var(--accent-primary)',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+                title="Open HostelBot AI Copilot"
+              >
+                <span>🤖</span>
+                <span>AI Assistant</span>
+              </button>
+
+              {/* Language Selector in Navbar */}
+              <div style={{ display: 'flex', gap: '2px', background: 'var(--bg-card)', padding: '2px', borderRadius: '8px', border: '1px solid var(--border-default)' }}>
+                {[
+                  { code: 'en', label: 'EN' },
+                  { code: 'hi', label: 'HI' },
+                  { code: 'ta', label: 'TA' },
+                  { code: 'te', label: 'TE' },
+                ].map((l) => (
+                  <button
+                    key={l.code}
+                    onClick={() => dispatch(setLanguage(l.code))}
+                    style={{
+                      padding: '3px 7px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: 'transparent',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
 
               {/* Settings Button (Only visible when logged in) */}
               <button
@@ -508,7 +521,16 @@ export default function App() {
       )}
 
       {/* ══ Main Viewport ══ */}
-      <main className="main-viewport" style={{ paddingBottom: '60px' }}>
+      <main
+        className="main-viewport"
+        style={{
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: currentRole === 'login' ? 'center' : 'stretch',
+          paddingBottom: currentRole === 'login' ? '0' : '60px',
+        }}
+      >
         {ActiveView}
       </main>
 
@@ -530,6 +552,39 @@ export default function App() {
         onClose={() => setShowProcurement(false)}
         onAssetCreated={() => dispatch(fetchInitialData())}
       />
+
+      {/* ══ HostelBot AI Assistant ══ */}
+      <HostelBotAI isOpen={aiOpen} onClose={() => setAiOpen(false)} />
+
+      {/* Floating AI Launcher */}
+      {currentRole !== 'login' && !aiOpen && (
+        <button
+          onClick={() => setAiOpen(true)}
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            zIndex: 9000,
+            padding: '12px 18px',
+            borderRadius: '999px',
+            background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
+            color: '#ffffff',
+            border: 'none',
+            boxShadow: '0 6px 20px rgba(37, 99, 235, 0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontWeight: 700,
+            fontSize: '13px',
+            cursor: 'pointer',
+            transition: 'transform 0.2s ease',
+          }}
+          title="Ask HostelBot AI"
+        >
+          <span style={{ fontSize: '16px' }}>🤖</span>
+          <span>Ask HostelBot AI</span>
+        </button>
+      )}
 
       {/* ══ Global Toast Alerts ══ */}
       <ToastHost />

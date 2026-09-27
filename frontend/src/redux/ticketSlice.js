@@ -97,10 +97,48 @@ export const fetchInitialData = createAsyncThunk(
       const rawResidents = extract(residentsRes, 'residents', { residents: [] });
       const residentsData = Array.isArray(rawResidents) ? rawResidents : rawResidents?.residents || [];
 
+      const rawMaintenance = extract(maintenanceRes, 'maintenance', []);
+      const assetsList = extract(assetsRes, 'assets', []);
+      const assetMap = {};
+      if (Array.isArray(assetsList)) {
+        assetsList.forEach((a) => {
+          if (a?.tag) assetMap[a.tag] = a;
+        });
+      }
+
+      const normalizedMaintenance = (Array.isArray(rawMaintenance) ? rawMaintenance : []).map((t, idx) => {
+        const asset = assetMap[t.asset_tag];
+        const actionText = t.action || t.issue_description || t.issueDescription || '';
+        const isRepaired = t.status === 'Repaired' || /good|passed|done|updated|repaired/i.test(actionText);
+        const isInProgress = t.status === 'In Progress' || /under maintenance|refill|servicing/i.test(actionText);
+        const isDamaged = /damaged|needs repair|crack|broken|flickering|bent/i.test(actionText);
+
+        const ticketId = t.ticket_id || t.ticketId || `MNT-${String(t._id || idx + 101).slice(-5).toUpperCase()}`;
+        const status = t.status || (isRepaired ? 'Repaired' : isInProgress ? 'In Progress' : 'Reported');
+        const issueDesc = t.issue_description || t.issueDescription || t.action || 'Scheduled preventive maintenance & safety check';
+
+        return {
+          ...t,
+          ticket_id: ticketId,
+          ticketId,
+          asset_tag: t.asset_tag || asset?.tag || 'AST-GEN',
+          asset_name: t.asset_name || asset?.name || 'Institutional Equipment',
+          category: t.category || asset?.category || 'Equipment',
+          location: t.location || asset?.location || (asset ? `${asset.block} - ${asset.room}` : 'Hostel Facility'),
+          issue_description: issueDesc,
+          urgency: t.urgency || (isDamaged ? 'High' : isInProgress ? 'Medium' : 'Routine'),
+          reported_by: t.reported_by || t.actor || 'Facility Supervisor',
+          assigned_technician: t.assigned_technician || (t.actor && /kamal|kumar|selvam/i.test(t.actor) ? t.actor : 'Unassigned'),
+          status,
+          repair_cost: t.repair_cost !== undefined ? t.repair_cost : (isRepaired ? 350 : isInProgress ? 650 : 0),
+          reported_date: t.reported_date || t.date || (t.createdAt ? new Date(t.createdAt).toLocaleDateString() : 'Recent'),
+        };
+      });
+
       return {
-        assets: extract(assetsRes, 'assets', []),
+        assets: assetsList,
         categories: extract(categoriesRes, 'categories', []),
-        maintenanceTickets: extract(maintenanceRes, 'maintenance', []),
+        maintenanceTickets: normalizedMaintenance,
         transfers: extract(transfersRes, 'transfers', []),
         audits: extract(auditsRes, 'audits', []),
         disposals: extract(disposalsRes, 'disposals', []),
@@ -365,7 +403,7 @@ const initialState = {
   /* UI Preferences */
   viewMode: 'desktop',
   themeMode: 'light',
-  colorTheme: 'cyan',
+  colorTheme: 'corporate',
   fontStyle: 'inter',
   fontSize: 'normal',
 
@@ -390,6 +428,7 @@ const initialState = {
   qrScannerModalOpen: false,
   newAssetModalOpen: false,
   allocateModalOpen: false,
+  aiDrawerOpen: false,
   transferModalOpen: false,
   returnModalOpen: false,
   maintenanceModalOpen: false,
@@ -543,6 +582,24 @@ export const ticketSlice = createSlice({
     },
     setLanguage: (state, action) => {
       state.language = action.payload;
+    },
+    addTicket: (state, action) => {
+      const tk = action.payload;
+      state.maintenanceTickets.unshift({
+        ticket_id: tk.id || `TKT-${Date.now()}`,
+        asset_tag: tk.assetTag || 'GEN-MAINT',
+        asset_name: tk.title || 'Hostel Maintenance',
+        issue_description: tk.description || tk.title,
+        priority: tk.priority || 'Medium',
+        status: tk.status === 'Resolved' ? 'Completed' : 'Reported',
+        reporter_name: tk.student || tk.creatorRole || 'HostelBot AI',
+        location: tk.room ? `Room ${tk.room}` : 'Hostel Common',
+        date: new Date().toISOString(),
+        cost: tk.cost || 0,
+      });
+    },
+    setAiDrawerOpen: (state, action) => {
+      state.aiDrawerOpen = action.payload;
     },
     updateUserProfile: (state, action) => {
       state.currentUser = { ...state.currentUser, ...action.payload };
@@ -780,6 +837,8 @@ export const {
   setCheckoutModalOpen,
   setRoomsList,
   setResidentsList,
+  addTicket,
+  setAiDrawerOpen,
   addToast,
   removeToast,
   markNotificationRead,

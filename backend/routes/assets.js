@@ -854,7 +854,41 @@ router.get('/transfers/all', async (req, res) => {
 // GET /api/assets/maintenance/all — List all maintenance tickets
 router.get('/maintenance/all', async (req, res) => {
   try {
-    const tickets = await AssetMaintenance.find().sort({ createdAt: -1 }).lean();
+    const rawTickets = await AssetMaintenance.find().sort({ createdAt: -1 }).lean();
+    const assets = await Asset.find().select('tag name category block room location').lean();
+    const assetMap = {};
+    assets.forEach((a) => {
+      if (a.tag) assetMap[a.tag] = a;
+    });
+
+    const tickets = rawTickets.map((t, idx) => {
+      const asset = assetMap[t.asset_tag];
+      const actionText = t.action || t.issue_description || '';
+      const isRepaired = t.status === 'Repaired' || /good|passed|done|updated|repaired/i.test(actionText);
+      const isInProgress = t.status === 'In Progress' || /under maintenance|refill|servicing/i.test(actionText);
+      const isDamaged = /damaged|needs repair|crack|broken|flickering|bent/i.test(actionText);
+
+      const ticketId = t.ticket_id || `MNT-${String(t._id || idx + 101).slice(-5).toUpperCase()}`;
+      const status = t.status || (isRepaired ? 'Repaired' : isInProgress ? 'In Progress' : 'Reported');
+      const issueDesc = t.issue_description || t.action || 'Scheduled preventive maintenance & safety inspection';
+
+      return {
+        ...t,
+        ticket_id: ticketId,
+        asset_tag: t.asset_tag || asset?.tag || 'AST-GEN',
+        asset_name: t.asset_name || asset?.name || 'Institutional Equipment',
+        category: t.category || asset?.category || 'Equipment',
+        location: t.location || asset?.location || (asset ? `${asset.block} - ${asset.room}` : 'Campus Hostel Facility'),
+        issue_description: issueDesc,
+        urgency: t.urgency || (isDamaged ? 'High' : isInProgress ? 'Medium' : 'Routine'),
+        reported_by: t.reported_by || t.actor || 'Facility Supervisor',
+        assigned_technician: t.assigned_technician || (t.actor && /kamal|kumar|selvam/i.test(t.actor) ? t.actor : 'Unassigned'),
+        status,
+        repair_cost: t.repair_cost !== undefined ? t.repair_cost : (isRepaired ? 350 : isInProgress ? 650 : 0),
+        reported_date: t.reported_date || t.date || (t.createdAt ? new Date(t.createdAt).toLocaleDateString() : 'Recent'),
+      };
+    });
+
     res.json(tickets);
   } catch (err) {
     res.status(500).json({ success: false, message: 'Could not fetch maintenance tickets.', error: err.message });
@@ -959,7 +993,10 @@ router.patch('/maintenance/:ticketId', authenticate, async (req, res) => {
       notes = '',
     } = req.body;
 
-    const ticket = await AssetMaintenance.findOne({ ticket_id: ticketId });
+    const isObjectId = mongoose.isValidObjectId(ticketId);
+    const ticket = await AssetMaintenance.findOne({
+      $or: [{ ticket_id: ticketId }, ...(isObjectId ? [{ _id: ticketId }] : [])],
+    });
     if (!ticket) return res.status(404).json({ success: false, message: 'Maintenance ticket not found.' });
 
     if (status) ticket.status = status;

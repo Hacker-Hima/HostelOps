@@ -664,12 +664,11 @@ function StudentProfile({ currentUser, tickets, t }) {
 
   return (
     <>
-      <div style={{ background:'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(6,182,212,0.1))', border:'1px solid var(--border-default)', borderRadius:'var(--radius-xl)', padding:24, textAlign:'center', marginBottom:14, position:'relative', overflow:'hidden' }}>
-        <div style={{ position:'absolute', top:-20, right:-20, width:80, height:80, borderRadius:'50%', background:'rgba(6,182,212,0.1)', pointerEvents:'none' }} />
+      <div style={{ background:'var(--accent-primary-soft)', border:'1px solid var(--border-strong)', borderRadius:'var(--radius-xl)', padding:24, textAlign:'center', marginBottom:14, position:'relative', overflow:'hidden' }}>
         <div className="avatar avatar-xl" style={{ margin:'0 auto 12px' }}>{currentUser.initials}</div>
         <h3 style={{ marginBottom:4 }}>{currentUser.name}</h3>
         <p style={{ color:'var(--text-secondary)', fontSize:12 }}>{currentUser.rollNumber}</p>
-        <p style={{ color:'var(--accent-cyan)', fontSize:11, marginTop:4 }}>{currentUser.email}</p>
+        <p style={{ color:'var(--text-accent)', fontSize:11, marginTop:4 }}>{currentUser.email}</p>
         <div style={{ display:'flex', justifyContent:'center', gap:20, marginTop:14 }}>
           {[{v:myTickets.length,l:t('my_tickets', 'Tickets')},{v:myTickets.filter(tk=>tk.status==='Resolved').length,l:t('resolved', 'Resolved')},{v:myTickets.filter(tk=>tk.status==='Pending').length,l:t('pending', 'Pending')}].map(({v,l})=>(
             <div key={l} style={{ textAlign:'center' }}>

@@ -66,9 +66,9 @@ export default function QrScannerModal() {
               position: 'absolute',
               left: 0,
               right: 0,
-              height: '3px',
-              background: 'linear-gradient(90deg, transparent, #00ffc8, transparent)',
-              boxShadow: '0 0 15px #00ffc8',
+              height: '2px',
+              background: 'linear-gradient(90deg, transparent, var(--accent-primary), transparent)',
+              boxShadow: '0 0 8px rgba(37, 99, 235, 0.4)',
               animation: 'scanLaser 2.2s infinite ease-in-out',
             }}
           />

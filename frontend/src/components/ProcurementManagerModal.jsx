@@ -1,50 +1,50 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
-// Self-contained high-fidelity SVG icons
+// Self-contained high-fidelity SVG icons with guaranteed dimensions
 const Icons = {
-  Cart: () => (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  Cart: ({ size = 20, color = 'currentColor', style = {} }) => (
+    <svg width={size} height={size} style={{ width: size, height: size, flexShrink: 0, ...style }} fill="none" viewBox="0 0 24 24" stroke={color}>
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
     </svg>
   ),
-  Building: () => (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  Building: ({ size = 16, color = 'currentColor', style = {} }) => (
+    <svg width={size} height={size} style={{ width: size, height: size, flexShrink: 0, ...style }} fill="none" viewBox="0 0 24 24" stroke={color}>
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
     </svg>
   ),
-  CheckCircle: () => (
-    <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  CheckCircle: ({ size = 16, color = '#10b981', style = {} }) => (
+    <svg width={size} height={size} style={{ width: size, height: size, flexShrink: 0, ...style }} fill="none" viewBox="0 0 24 24" stroke={color}>
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   ),
-  ShieldCheck: () => (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  ShieldCheck: ({ size = 16, color = 'currentColor', style = {} }) => (
+    <svg width={size} height={size} style={{ width: size, height: size, flexShrink: 0, ...style }} fill="none" viewBox="0 0 24 24" stroke={color}>
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
     </svg>
   ),
-  Truck: () => (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  Truck: ({ size = 16, color = 'currentColor', style = {} }) => (
+    <svg width={size} height={size} style={{ width: size, height: size, flexShrink: 0, ...style }} fill="none" viewBox="0 0 24 24" stroke={color}>
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
     </svg>
   ),
-  Star: () => (
-    <svg className="w-3.5 h-3.5 fill-amber-400 text-amber-400" viewBox="0 0 20 20">
+  Star: ({ size = 14, color = '#f59e0b', style = {} }) => (
+    <svg width={size} height={size} style={{ width: size, height: size, flexShrink: 0, ...style }} fill={color} viewBox="0 0 20 20">
       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
     </svg>
   ),
-  Plus: () => (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  Plus: ({ size = 16, color = 'currentColor', style = {} }) => (
+    <svg width={size} height={size} style={{ width: size, height: size, flexShrink: 0, ...style }} fill="none" viewBox="0 0 24 24" stroke={color}>
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
     </svg>
   ),
-  Close: () => (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  Close: ({ size = 18, color = 'currentColor', style = {} }) => (
+    <svg width={size} height={size} style={{ width: size, height: size, flexShrink: 0, ...style }} fill="none" viewBox="0 0 24 24" stroke={color}>
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
     </svg>
   ),
-  Refresh: () => (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  Refresh: ({ size = 16, color = 'currentColor', style = {} }) => (
+    <svg width={size} height={size} style={{ width: size, height: size, flexShrink: 0, ...style }} fill="none" viewBox="0 0 24 24" stroke={color}>
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
     </svg>
   ),
@@ -191,104 +191,278 @@ export default function ProcurementManagerModal({ isOpen, onClose, onAssetCreate
 
   if (!isOpen) return null;
 
+  const statusStyles = {
+    'Pending Approval': { bg: 'rgba(217, 119, 6, 0.12)', color: '#d97706', border: 'rgba(217, 119, 6, 0.25)' },
+    Approved: { bg: 'rgba(37, 99, 235, 0.12)', color: '#2563eb', border: 'rgba(37, 99, 235, 0.25)' },
+    Ordered: { bg: 'rgba(124, 58, 237, 0.12)', color: '#7c3aed', border: 'rgba(124, 58, 237, 0.25)' },
+    Received: { bg: 'rgba(5, 150, 105, 0.12)', color: '#059669', border: 'rgba(5, 150, 105, 0.25)' },
+    Cancelled: { bg: 'rgba(220, 38, 38, 0.12)', color: '#dc2626', border: 'rgba(220, 38, 38, 0.25)' },
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
-      <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100">
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+        background: 'rgba(0, 0, 0, 0.72)',
+        backdropFilter: 'blur(8px)',
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: '1050px',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          background: 'var(--bg-surface)',
+          color: 'var(--text-primary)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: '18px',
+          boxShadow: 'var(--shadow-float)',
+          overflow: 'hidden',
+        }}
+      >
         {/* Header */}
-        <div className="px-6 py-5 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
-              <Icons.Cart />
+        <div
+          style={{
+            padding: '18px 24px',
+            borderBottom: '1px solid var(--border-subtle)',
+            background: 'var(--bg-card)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '16px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '12px',
+                background: 'var(--accent-primary-soft)',
+                color: 'var(--accent-primary)',
+                border: '1px solid rgba(37, 99, 235, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Icons.Cart size={22} color="var(--accent-primary)" />
             </div>
             <div>
-              <div className="flex items-center space-x-2">
-                <h2 className="text-xl font-bold tracking-tight text-white">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
                   Procurement & Vendor Lifecycle Hub
                 </h2>
-                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <span
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    borderRadius: '999px',
+                    background: 'rgba(5, 150, 105, 0.1)',
+                    color: '#059669',
+                    border: '1px solid rgba(5, 150, 105, 0.25)',
+                  }}
+                >
                   Institutional
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
                 Purchase Order pipeline, Supplier Scorecards & Auto-Asset Tag Registration
               </p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
               onClick={fetchProcurementData}
               disabled={loading}
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
               title="Refresh"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '34px',
+                height: '34px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-subtle)',
+                background: 'var(--bg-glass)',
+                color: 'var(--text-secondary)',
+                cursor: loading ? 'not-allowed' : 'pointer',
+              }}
             >
-              <Icons.Refresh />
+              <Icons.Refresh size={16} />
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+              title="Close"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '34px',
+                height: '34px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-subtle)',
+                background: 'var(--bg-glass)',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+              }}
             >
-              <Icons.Close />
+              <Icons.Close size={18} />
             </button>
           </div>
         </div>
 
         {/* Metrics Banner */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-6 py-3.5 bg-slate-800/40 border-b border-slate-800">
-          <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-            <div className="text-xs text-slate-400">Active Pipeline</div>
-            <div className="text-lg font-bold text-white flex items-center justify-between">
-              {orderMetrics.totalOrders || orders.length} Orders
-              <span className="text-xs font-normal px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400">
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '12px',
+            padding: '14px 24px',
+            background: 'var(--bg-card-hover)',
+            borderBottom: '1px solid var(--border-subtle)',
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--bg-surface)',
+              padding: '12px 14px',
+              borderRadius: '10px',
+              border: '1px solid var(--border-subtle)',
+            }}
+          >
+            <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', marginBottom: '4px' }}>
+              Active Pipeline
+            </div>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>{orderMetrics.totalOrders || orders.length} Orders</span>
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  padding: '2px 6px',
+                  borderRadius: '6px',
+                  background: 'rgba(217, 119, 6, 0.1)',
+                  color: '#d97706',
+                }}
+              >
                 {orderMetrics.pendingApproval || 0} Pending
               </span>
             </div>
           </div>
-          <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-            <div className="text-xs text-slate-400">Committed Spend</div>
-            <div className="text-lg font-bold text-indigo-400">
+
+          <div
+            style={{
+              background: 'var(--bg-surface)',
+              padding: '12px 14px',
+              borderRadius: '10px',
+              border: '1px solid var(--border-subtle)',
+            }}
+          >
+            <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', marginBottom: '4px' }}>
+              Committed Spend
+            </div>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--accent-primary)' }}>
               ₹{(orderMetrics.totalCommittedSpend || 0).toLocaleString()}
             </div>
           </div>
-          <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-            <div className="text-xs text-slate-400">Verified Vendors</div>
-            <div className="text-lg font-bold text-emerald-400 flex items-center justify-between">
-              {vendorMetrics.totalVendors || vendors.length} Suppliers
-              <span className="text-xs font-normal text-slate-400 flex items-center">
-                <Icons.Star />
-                <span className="ml-1">{vendorMetrics.avgRating || '4.5'}</span>
+
+          <div
+            style={{
+              background: 'var(--bg-surface)',
+              padding: '12px 14px',
+              borderRadius: '10px',
+              border: '1px solid var(--border-subtle)',
+            }}
+          >
+            <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', marginBottom: '4px' }}>
+              Verified Vendors
+            </div>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>{vendorMetrics.totalVendors || vendors.length} Suppliers</span>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Icons.Star size={13} color="#f59e0b" />
+                <span>{vendorMetrics.avgRating || '4.5'}</span>
               </span>
             </div>
           </div>
-          <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-            <div className="text-xs text-slate-400">Auto-Inventory Mint</div>
-            <div className="text-lg font-bold text-sky-400 flex items-center space-x-1">
-              <Icons.ShieldCheck />
-              <span className="ml-1">AST-2026 Ready</span>
+
+          <div
+            style={{
+              background: 'var(--bg-surface)',
+              padding: '12px 14px',
+              borderRadius: '10px',
+              border: '1px solid var(--border-subtle)',
+            }}
+          >
+            <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', marginBottom: '4px' }}>
+              Auto-Inventory Mint
+            </div>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: '#0284c7', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Icons.ShieldCheck size={16} color="#0284c7" />
+              <span>AST-2026 Ready</span>
             </div>
           </div>
         </div>
 
         {/* Tab Switcher & Action Bar */}
-        <div className="px-6 py-3 border-b border-slate-800 bg-slate-900 flex items-center justify-between">
-          <div className="flex space-x-2">
+        <div
+          style={{
+            padding: '12px 24px',
+            borderBottom: '1px solid var(--border-subtle)',
+            background: 'var(--bg-surface)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ display: 'flex', gap: '8px' }}>
             <button
               onClick={() => setActiveTab('orders')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                activeTab === 'orders'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-              }`}
+              style={{
+                padding: '7px 16px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 600,
+                border: '1px solid',
+                borderColor: activeTab === 'orders' ? 'var(--accent-primary)' : 'var(--border-subtle)',
+                background: activeTab === 'orders' ? 'var(--accent-primary)' : 'transparent',
+                color: activeTab === 'orders' ? '#ffffff' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
             >
               Purchase Orders ({orders.length})
             </button>
             <button
               onClick={() => setActiveTab('vendors')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                activeTab === 'vendors'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-              }`}
+              style={{
+                padding: '7px 16px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 600,
+                border: '1px solid',
+                borderColor: activeTab === 'vendors' ? 'var(--accent-primary)' : 'var(--border-subtle)',
+                background: activeTab === 'vendors' ? 'var(--accent-primary)' : 'transparent',
+                color: activeTab === 'vendors' ? '#ffffff' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
             >
               Vendors & Scorecards ({vendors.length})
             </button>
@@ -297,51 +471,91 @@ export default function ProcurementManagerModal({ isOpen, onClose, onAssetCreate
           {activeTab === 'orders' && (
             <button
               onClick={() => setShowNewPo(true)}
-              className="flex items-center space-x-2 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: 'none',
+                background: 'var(--accent-primary)',
+                color: '#ffffff',
+                cursor: 'pointer',
+                boxShadow: 'var(--shadow-sm)',
+              }}
             >
-              <Icons.Plus />
-              <span className="ml-1">New Purchase Order</span>
+              <Icons.Plus size={15} color="#ffffff" />
+              <span>New Purchase Order</span>
             </button>
           )}
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {activeTab === 'orders' ? (
             orders.length === 0 ? (
-              <div className="text-center py-12 text-slate-500">
-                <div className="flex justify-center mb-3 opacity-30">
-                  <Icons.Cart />
+              <div style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--text-muted)' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px', opacity: 0.4 }}>
+                  <Icons.Cart size={40} />
                 </div>
-                <p>No purchase orders found. Click "New Purchase Order" to begin.</p>
+                <p style={{ fontSize: '14px', margin: 0 }}>No purchase orders found. Click "New Purchase Order" to begin.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {orders.map((po) => {
-                  const statusColors = {
-                    'Pending Approval': 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-                    Approved: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-                    Ordered: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
-                    Received: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-                    Cancelled: 'bg-red-500/10 text-red-400 border-red-500/30',
-                  };
+                  const sStyle = statusStyles[po.status] || { bg: 'rgba(100, 116, 139, 0.1)', color: 'var(--text-secondary)', border: 'var(--border-subtle)' };
 
                   return (
                     <div
                       key={po.poNumber || po._id}
-                      className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60 hover:border-slate-600 transition"
+                      style={{
+                        padding: '16px',
+                        borderRadius: '12px',
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-subtle)',
+                        boxShadow: 'var(--shadow-card)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                      }}
                     >
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-700/40">
-                        <div className="flex items-center space-x-3">
-                          <span className="font-mono text-sm font-bold text-indigo-400 bg-indigo-950/60 px-2.5 py-1 rounded-md border border-indigo-800/40">
+                      {/* Top Header of Card */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          flexWrap: 'wrap',
+                          paddingBottom: '10px',
+                          borderBottom: '1px solid var(--border-subtle)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span
+                            style={{
+                              fontFamily: 'monospace',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              color: 'var(--accent-primary)',
+                              background: 'var(--accent-primary-soft)',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid rgba(37, 99, 235, 0.2)',
+                            }}
+                          >
                             {po.poNumber}
                           </span>
                           <div>
-                            <h3 className="text-sm font-semibold text-white">{po.title}</h3>
-                            <div className="text-xs text-slate-400 flex items-center space-x-2 mt-0.5">
-                              <span className="flex items-center">
-                                <Icons.Building />
-                                <span className="ml-1">{po.vendorName}</span>
+                            <h3 style={{ fontSize: '14px', fontWeight: 650, margin: 0, color: 'var(--text-primary)' }}>
+                              {po.title}
+                            </h3>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <Icons.Building size={14} color="var(--text-muted)" />
+                                <span>{po.vendorName}</span>
                               </span>
                               <span>•</span>
                               <span>Category: {po.category}</span>
@@ -349,38 +563,52 @@ export default function ProcurementManagerModal({ isOpen, onClose, onAssetCreate
                           </div>
                         </div>
 
-                        <div className="flex items-center space-x-3">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <span
-                            className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${
-                              statusColors[po.status] || 'bg-slate-700 text-slate-300'
-                            }`}
+                            style={{
+                              padding: '3px 10px',
+                              fontSize: '11px',
+                              fontWeight: 650,
+                              borderRadius: '999px',
+                              background: sStyle.bg,
+                              color: sStyle.color,
+                              border: `1px solid ${sStyle.border}`,
+                            }}
                           >
                             {po.status}
                           </span>
-                          <span className="text-base font-bold text-white">
+                          <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
                             ₹{(po.totalAmount || 0).toLocaleString()}
                           </span>
                         </div>
                       </div>
 
                       {/* Item Details */}
-                      <div className="py-3 text-xs text-slate-300 grid grid-cols-1 md:grid-cols-3 gap-2">
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '8px' }}>
                         {po.items?.map((it, idx) => (
                           <div
                             key={idx}
-                            className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800 flex justify-between items-center"
+                            style={{
+                              background: 'var(--bg-card-hover)',
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid var(--border-subtle)',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}
                           >
                             <div>
-                              <div className="font-medium text-slate-200">{it.itemName}</div>
-                              <div className="text-slate-400">
+                              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{it.itemName}</div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                                 Target: {it.targetBlock} ({it.targetRoom || 'Store'})
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="font-bold text-slate-100">
-                                {it.quantity} x ₹{it.unitPrice}
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '12px', fontWeight: 650, color: 'var(--text-primary)' }}>
+                                {it.quantity} × ₹{it.unitPrice}
                               </div>
-                              <div className="text-slate-400 font-mono">
+                              <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
                                 ₹{it.quantity * it.unitPrice}
                               </div>
                             </div>
@@ -390,18 +618,32 @@ export default function ProcurementManagerModal({ isOpen, onClose, onAssetCreate
 
                       {/* Generated Tags if Received */}
                       {po.status === 'Received' && po.generatedAssetTags?.length > 0 && (
-                        <div className="mt-2 p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-800/40 text-xs">
-                          <div className="font-semibold text-emerald-400 flex items-center mb-1.5">
-                            <Icons.CheckCircle />
-                            <span className="ml-1">
-                              Inventory Minted: {po.generatedAssetTags.length} Institutional Assets
-                            </span>
+                        <div
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            background: 'rgba(5, 150, 105, 0.08)',
+                            border: '1px solid rgba(5, 150, 105, 0.25)',
+                            fontSize: '12px',
+                          }}
+                        >
+                          <div style={{ fontWeight: 600, color: '#059669', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                            <Icons.CheckCircle size={15} color="#059669" />
+                            <span>Inventory Minted: {po.generatedAssetTags.length} Institutional Assets</span>
                           </div>
-                          <div className="flex flex-wrap gap-1.5">
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                             {po.generatedAssetTags.map((t) => (
                               <span
                                 key={t}
-                                className="font-mono bg-emerald-900/40 text-emerald-300 px-2 py-0.5 rounded border border-emerald-700/50"
+                                style={{
+                                  fontFamily: 'monospace',
+                                  fontSize: '11px',
+                                  background: 'var(--bg-surface)',
+                                  color: '#059669',
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(5, 150, 105, 0.3)',
+                                }}
                               >
                                 {t}
                               </span>
@@ -411,16 +653,34 @@ export default function ProcurementManagerModal({ isOpen, onClose, onAssetCreate
                       )}
 
                       {/* Action Bar */}
-                      <div className="mt-3 pt-3 border-t border-slate-700/40 flex items-center justify-between text-xs">
-                        <span className="text-slate-400">
-                          Requested by: <strong className="text-slate-300">{po.requestedBy}</strong>
+                      <div
+                        style={{
+                          paddingTop: '8px',
+                          borderTop: '1px solid var(--border-subtle)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <span style={{ color: 'var(--text-muted)' }}>
+                          Requested by: <strong style={{ color: 'var(--text-primary)' }}>{po.requestedBy}</strong>
                         </span>
 
-                        <div className="flex items-center space-x-2">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           {po.status === 'Pending Approval' && (
                             <button
                               onClick={() => handleUpdateStatus(po.poNumber, 'Approved')}
-                              className="px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-medium transition"
+                              style={{
+                                padding: '6px 14px',
+                                borderRadius: '6px',
+                                background: 'var(--accent-primary)',
+                                color: '#ffffff',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                border: 'none',
+                                cursor: 'pointer',
+                              }}
                             >
                               Approve Purchase Order
                             </button>
@@ -428,10 +688,22 @@ export default function ProcurementManagerModal({ isOpen, onClose, onAssetCreate
                           {po.status === 'Approved' && (
                             <button
                               onClick={() => handleUpdateStatus(po.poNumber, 'Ordered')}
-                              className="px-3 py-1.5 rounded-md bg-purple-600 hover:bg-purple-500 text-white font-medium transition flex items-center space-x-1"
+                              style={{
+                                padding: '6px 14px',
+                                borderRadius: '6px',
+                                background: '#7c3aed',
+                                color: '#ffffff',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                              }}
                             >
-                              <Icons.Truck />
-                              <span className="ml-1">Mark Dispatched/Ordered</span>
+                              <Icons.Truck size={14} color="#ffffff" />
+                              <span>Mark Dispatched/Ordered</span>
                             </button>
                           )}
                           {po.status === 'Ordered' && (
@@ -444,10 +716,23 @@ export default function ProcurementManagerModal({ isOpen, onClose, onAssetCreate
                                   receivingNotes: `Inspection cleared on arrival by Warden.`,
                                 });
                               }}
-                              className="px-3.5 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-sm transition flex items-center space-x-1"
+                              style={{
+                                padding: '6px 14px',
+                                borderRadius: '6px',
+                                background: '#059669',
+                                color: '#ffffff',
+                                fontSize: '12px',
+                                fontWeight: 650,
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: 'var(--shadow-sm)',
+                              }}
                             >
-                              <Icons.ShieldCheck />
-                              <span className="ml-1">Receive Goods & Auto-Tag</span>
+                              <Icons.ShieldCheck size={15} color="#ffffff" />
+                              <span>Receive Goods & Auto-Tag</span>
                             </button>
                           )}
                         </div>
@@ -459,58 +744,90 @@ export default function ProcurementManagerModal({ isOpen, onClose, onAssetCreate
             )
           ) : (
             /* Vendors Tab */
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '14px' }}>
               {vendors.map((v) => (
                 <div
                   key={v.vendorId || v._id}
-                  className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60 hover:border-slate-600 transition flex flex-col justify-between"
+                  style={{
+                    padding: '16px',
+                    borderRadius: '12px',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-subtle)',
+                    boxShadow: 'var(--shadow-card)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                  }}
                 >
                   <div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-semibold text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span
+                        style={{
+                          fontFamily: 'monospace',
+                          fontSize: '11px',
+                          fontWeight: 650,
+                          color: 'var(--text-secondary)',
+                          background: 'var(--bg-card-hover)',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          border: '1px solid var(--border-subtle)',
+                        }}
+                      >
                         {v.vendorId}
                       </span>
-                      <div className="flex items-center text-amber-400 text-xs font-bold">
-                        <Icons.Star />
-                        <span className="ml-1">{v.rating} / 5.0</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#d97706', fontSize: '12px', fontWeight: 700 }}>
+                        <Icons.Star size={13} color="#f59e0b" />
+                        <span>{v.rating} / 5.0</span>
                       </div>
                     </div>
 
-                    <h3 className="text-base font-bold text-white mt-2">{v.name}</h3>
-                    <div className="text-xs text-indigo-400 font-medium mb-3">{v.category}</div>
+                    <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '8px', marginBottom: '2px' }}>
+                      {v.name}
+                    </h3>
+                    <div style={{ fontSize: '12px', color: 'var(--accent-primary)', fontWeight: 600, marginBottom: '12px' }}>
+                      {v.category}
+                    </div>
 
-                    <div className="space-y-1.5 text-xs text-slate-300">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Contact:</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Contact:</span>
                         <span>{v.contactPerson} ({v.phone})</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Email:</span>
-                        <span className="text-slate-300 font-mono">{v.email}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Email:</span>
+                        <span style={{ fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{v.email}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">SLA Compliance:</span>
-                        <span className="text-emerald-400 font-semibold">{v.slaCompliance}%</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>SLA Compliance:</span>
+                        <span style={{ color: '#059669', fontWeight: 650 }}>{v.slaCompliance}%</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Lifetime Spend:</span>
-                        <span className="font-bold text-white">₹{(v.totalSpend || 0).toLocaleString()}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Lifetime Spend:</span>
+                        <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>₹{(v.totalSpend || 0).toLocaleString()}</span>
                       </div>
                     </div>
 
                     {v.catalog?.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-slate-700/40">
-                        <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                      <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
                           Standard Catalog Offerings
                         </div>
-                        <div className="space-y-1">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           {v.catalog.map((c, i) => (
                             <div
                               key={i}
-                              className="text-xs flex justify-between bg-slate-900/40 px-2 py-1 rounded text-slate-300"
+                              style={{
+                                fontSize: '11px',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                background: 'var(--bg-card-hover)',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                color: 'var(--text-secondary)',
+                              }}
                             >
                               <span>{c.itemName}</span>
-                              <span className="font-mono text-slate-400">₹{c.unitPrice}</span>
+                              <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>₹{c.unitPrice}</span>
                             </div>
                           ))}
                         </div>
@@ -518,8 +835,17 @@ export default function ProcurementManagerModal({ isOpen, onClose, onAssetCreate
                     )}
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-700/50 flex items-center justify-between">
-                    <span className="text-xs text-slate-400">{v.ordersCount || 0} completed orders</span>
+                  <div
+                    style={{
+                      marginTop: '14px',
+                      paddingTop: '10px',
+                      borderTop: '1px solid var(--border-subtle)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{v.ordersCount || 0} completed orders</span>
                     <button
                       onClick={() => {
                         setNewPoForm((prev) => ({
@@ -530,7 +856,16 @@ export default function ProcurementManagerModal({ isOpen, onClose, onAssetCreate
                         }));
                         setShowNewPo(true);
                       }}
-                      className="px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white text-xs font-semibold border border-indigo-500/30 transition"
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: '6px',
+                        background: 'var(--accent-primary-soft)',
+                        border: '1px solid rgba(37, 99, 235, 0.25)',
+                        color: 'var(--accent-primary)',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
                     >
                       Create PO
                     </button>
@@ -543,41 +878,82 @@ export default function ProcurementManagerModal({ isOpen, onClose, onAssetCreate
 
         {/* Modal: New Purchase Order Form */}
         {showNewPo && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-            <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-slate-100">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <h3 className="text-base font-bold text-white flex items-center">
-                  <Icons.Plus />
-                  <span className="ml-1.5">Create Institutional Purchase Order</span>
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 10001,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px',
+              background: 'rgba(0, 0, 0, 0.78)',
+              backdropFilter: 'blur(8px)',
+            }}
+          >
+            <div
+              style={{
+                width: '100%',
+                maxWidth: '540px',
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-strong)',
+                borderRadius: '16px',
+                boxShadow: 'var(--shadow-float)',
+                padding: '24px',
+                color: 'var(--text-primary)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '12px', borderBottom: '1px solid var(--border-subtle)' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Icons.Plus size={16} color="var(--accent-primary)" />
+                  <span>Create Institutional Purchase Order</span>
                 </h3>
                 <button
                   onClick={() => setShowNewPo(false)}
-                  className="p-1 rounded-md text-slate-400 hover:text-white"
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                 >
-                  <Icons.Close />
+                  <Icons.Close size={18} />
                 </button>
               </div>
 
-              <form onSubmit={handleCreatePo} className="mt-4 space-y-3.5 text-xs">
+              <form onSubmit={handleCreatePo} style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '12px' }}>
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">PO Title / Purpose</label>
+                  <label style={{ display: 'block', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    PO Title / Purpose
+                  </label>
                   <input
                     type="text"
                     required
                     value={newPoForm.title}
                     onChange={(e) => setNewPoForm({ ...newPoForm, title: e.target.value })}
                     placeholder="e.g. Procurement of 4 Daikin 1.5T Split ACs for Block B"
-                    className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-input)',
+                      border: '1px solid var(--border-default)',
+                      color: 'var(--text-primary)',
+                      outline: 'none',
+                    }}
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">Vendor</label>
+                    <label style={{ display: 'block', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Vendor</label>
                     <select
                       value={newPoForm.vendorId}
                       onChange={(e) => setNewPoForm({ ...newPoForm, vendorId: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-indigo-500"
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        background: 'var(--bg-input)',
+                        border: '1px solid var(--border-default)',
+                        color: 'var(--text-primary)',
+                        outline: 'none',
+                      }}
                     >
                       {vendors.map((v) => (
                         <option key={v.vendorId} value={v.vendorId}>
@@ -587,11 +963,19 @@ export default function ProcurementManagerModal({ isOpen, onClose, onAssetCreate
                     </select>
                   </div>
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">Category</label>
+                    <label style={{ display: 'block', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Category</label>
                     <select
                       value={newPoForm.category}
                       onChange={(e) => setNewPoForm({ ...newPoForm, category: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-indigo-500"
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        background: 'var(--bg-input)',
+                        border: '1px solid var(--border-default)',
+                        color: 'var(--text-primary)',
+                        outline: 'none',
+                      }}
                     >
                       <option value="HVAC & Cooling">HVAC & Cooling</option>
                       <option value="Furniture & Woodwork">Furniture & Woodwork</option>
@@ -602,84 +986,149 @@ export default function ProcurementManagerModal({ isOpen, onClose, onAssetCreate
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-1">
-                    <label className="block text-slate-300 font-medium mb-1">Item Name</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Item Name</label>
                     <input
                       type="text"
                       required
                       value={newPoForm.itemName}
                       onChange={(e) => setNewPoForm({ ...newPoForm, itemName: e.target.value })}
                       placeholder="e.g. Split AC 1.5T"
-                      className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-indigo-500"
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        background: 'var(--bg-input)',
+                        border: '1px solid var(--border-default)',
+                        color: 'var(--text-primary)',
+                        outline: 'none',
+                      }}
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">Quantity</label>
+                    <label style={{ display: 'block', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Qty</label>
                     <input
                       type="number"
                       min="1"
                       required
                       value={newPoForm.quantity}
                       onChange={(e) => setNewPoForm({ ...newPoForm, quantity: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-indigo-500"
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        background: 'var(--bg-input)',
+                        border: '1px solid var(--border-default)',
+                        color: 'var(--text-primary)',
+                        outline: 'none',
+                      }}
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">Unit Price (₹)</label>
+                    <label style={{ display: 'block', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Price (₹)</label>
                     <input
                       type="number"
                       min="0"
                       required
                       value={newPoForm.unitPrice}
                       onChange={(e) => setNewPoForm({ ...newPoForm, unitPrice: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-indigo-500"
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        background: 'var(--bg-input)',
+                        border: '1px solid var(--border-default)',
+                        color: 'var(--text-primary)',
+                        outline: 'none',
+                      }}
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">Target Block</label>
+                    <label style={{ display: 'block', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Target Block</label>
                     <input
                       type="text"
                       value={newPoForm.targetBlock}
                       onChange={(e) => setNewPoForm({ ...newPoForm, targetBlock: e.target.value })}
                       placeholder="e.g. Block A"
-                      className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-indigo-500"
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        background: 'var(--bg-input)',
+                        border: '1px solid var(--border-default)',
+                        color: 'var(--text-primary)',
+                        outline: 'none',
+                      }}
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">Target Room / Store</label>
+                    <label style={{ display: 'block', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Target Room / Store</label>
                     <input
                       type="text"
                       value={newPoForm.targetRoom}
                       onChange={(e) => setNewPoForm({ ...newPoForm, targetRoom: e.target.value })}
                       placeholder="e.g. Room 204 or Store"
-                      className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-indigo-500"
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        background: 'var(--bg-input)',
+                        border: '1px solid var(--border-default)',
+                        color: 'var(--text-primary)',
+                        outline: 'none',
+                      }}
                     />
                   </div>
                 </div>
 
-                <div className="p-3 bg-indigo-950/40 rounded-xl border border-indigo-800/40 flex justify-between items-center">
-                  <span className="text-slate-300 font-medium">Estimated PO Total:</span>
-                  <span className="text-base font-bold text-white">
+                <div
+                  style={{
+                    padding: '12px',
+                    borderRadius: '10px',
+                    background: 'var(--accent-primary-soft)',
+                    border: '1px solid rgba(37, 99, 235, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Estimated PO Total:</span>
+                  <span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--accent-primary)' }}>
                     ₹{(Number(newPoForm.quantity || 0) * Number(newPoForm.unitPrice || 0)).toLocaleString()}
                   </span>
                 </div>
 
-                <div className="flex justify-end space-x-3 pt-2">
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '8px' }}>
                   <button
                     type="button"
                     onClick={() => setShowNewPo(false)}
-                    className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-card-hover)',
+                      border: '1px solid var(--border-subtle)',
+                      color: 'var(--text-secondary)',
+                      cursor: 'pointer',
+                    }}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-md"
+                    style={{
+                      padding: '8px 18px',
+                      borderRadius: '8px',
+                      background: 'var(--accent-primary)',
+                      border: 'none',
+                      color: '#ffffff',
+                      fontWeight: 650,
+                      cursor: submitting ? 'not-allowed' : 'pointer',
+                    }}
                   >
                     {submitting ? 'Submitting...' : 'Create Purchase Order'}
                   </button>
@@ -691,47 +1140,99 @@ export default function ProcurementManagerModal({ isOpen, onClose, onAssetCreate
 
         {/* Modal: Goods Received Inspection */}
         {receivingPo && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-            <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 text-slate-100">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <h3 className="text-base font-bold text-white flex items-center">
-                  <Icons.ShieldCheck />
-                  <span className="ml-1.5">Goods Received & Auto-Asset Mint</span>
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 10001,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px',
+              background: 'rgba(0, 0, 0, 0.78)',
+              backdropFilter: 'blur(8px)',
+            }}
+          >
+            <div
+              style={{
+                width: '100%',
+                maxWidth: '480px',
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-strong)',
+                borderRadius: '16px',
+                boxShadow: 'var(--shadow-float)',
+                padding: '24px',
+                color: 'var(--text-primary)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '12px', borderBottom: '1px solid var(--border-subtle)' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Icons.ShieldCheck size={18} color="#059669" />
+                  <span>Goods Received & Auto-Asset Mint</span>
                 </h3>
                 <button
                   onClick={() => setReceivingPo(null)}
-                  className="p-1 rounded-md text-slate-400 hover:text-white"
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                 >
-                  <Icons.Close />
+                  <Icons.Close size={18} />
                 </button>
               </div>
 
-              <div className="mt-3 p-3 bg-slate-800/60 rounded-xl border border-slate-700 text-xs">
-                <div className="font-semibold text-white">{receivingPo.title}</div>
-                <div className="text-slate-400 mt-1">Vendor: {receivingPo.vendorName}</div>
-                <div className="text-emerald-400 font-mono font-bold mt-1">
+              <div
+                style={{
+                  marginTop: '12px',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  background: 'var(--bg-card-hover)',
+                  border: '1px solid var(--border-subtle)',
+                  fontSize: '12px',
+                }}
+              >
+                <div style={{ fontWeight: 650, color: 'var(--text-primary)' }}>{receivingPo.title}</div>
+                <div style={{ color: 'var(--text-muted)', marginTop: '2px' }}>Vendor: {receivingPo.vendorName}</div>
+                <div style={{ color: '#059669', fontFamily: 'monospace', fontWeight: 700, marginTop: '4px' }}>
                   Mints {receivingPo.items?.reduce((s, it) => s + it.quantity, 0)} Assets with AST-2026 tags
                 </div>
               </div>
 
-              <form onSubmit={handleReceiveGoods} className="mt-4 space-y-3 text-xs">
+              <form onSubmit={handleReceiveGoods} style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '12px' }}>
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Invoice / Delivery Challan #</label>
+                  <label style={{ display: 'block', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    Invoice / Delivery Challan #
+                  </label>
                   <input
                     type="text"
                     required
                     value={receiveForm.invoiceNumber}
                     onChange={(e) => setReceiveForm({ ...receiveForm, invoiceNumber: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-indigo-500"
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-input)',
+                      border: '1px solid var(--border-default)',
+                      color: 'var(--text-primary)',
+                      outline: 'none',
+                    }}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Inspection Result</label>
+                  <label style={{ display: 'block', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    Inspection Result
+                  </label>
                   <select
                     value={receiveForm.conditionCheck}
                     onChange={(e) => setReceiveForm({ ...receiveForm, conditionCheck: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-indigo-500"
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-input)',
+                      border: '1px solid var(--border-default)',
+                      color: 'var(--text-primary)',
+                      outline: 'none',
+                    }}
                   >
                     <option value="Pass">Pass - Good Condition</option>
                     <option value="Minor defect">Needs Inspection / Minor Flaw</option>
@@ -739,30 +1240,59 @@ export default function ProcurementManagerModal({ isOpen, onClose, onAssetCreate
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Receiving Remarks / AMC Notes</label>
+                  <label style={{ display: 'block', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    Receiving Remarks / AMC Notes
+                  </label>
                   <textarea
                     rows={3}
                     value={receiveForm.receivingNotes}
                     onChange={(e) => setReceiveForm({ ...receiveForm, receivingNotes: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-indigo-500"
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-input)',
+                      border: '1px solid var(--border-default)',
+                      color: 'var(--text-primary)',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                    }}
                   />
                 </div>
 
-                <div className="flex justify-end space-x-3 pt-2">
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '8px' }}>
                   <button
                     type="button"
                     onClick={() => setReceivingPo(null)}
-                    className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-card-hover)',
+                      border: '1px solid var(--border-subtle)',
+                      color: 'var(--text-secondary)',
+                      cursor: 'pointer',
+                    }}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-md flex items-center space-x-1"
+                    style={{
+                      padding: '8px 18px',
+                      borderRadius: '8px',
+                      background: '#059669',
+                      border: 'none',
+                      color: '#ffffff',
+                      fontWeight: 650,
+                      cursor: submitting ? 'not-allowed' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
                   >
-                    <Icons.CheckCircle />
-                    <span className="ml-1">{submitting ? 'Minting Assets...' : 'Confirm & Register Assets'}</span>
+                    <Icons.CheckCircle size={15} color="#ffffff" />
+                    <span>{submitting ? 'Minting Assets...' : 'Confirm & Register Assets'}</span>
                   </button>
                 </div>
               </form>

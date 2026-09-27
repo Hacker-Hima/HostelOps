@@ -74,7 +74,7 @@ export default function MiniTrendChart({
           strokeLinejoin="round"
           strokeLinecap="round"
           style={{
-            filter: `drop-shadow(0 1px 6px ${color === 'var(--accent-primary)' ? 'rgba(124,58,237,0.4)' : 'rgba(0,0,0,0.3)'})`,
+            filter: `drop-shadow(0 1px 3px ${color === 'var(--accent-primary)' ? 'rgba(37,99,235,0.2)' : 'rgba(0,0,0,0.1)'})`,
           }}
         />
 

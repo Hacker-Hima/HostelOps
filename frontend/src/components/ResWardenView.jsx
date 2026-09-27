@@ -10,10 +10,10 @@ import EmptyState from './EmptyState';
 import MiniTrendChart from './MiniTrendChart';
 
 const BLOCK_DATA = [
-  { name:'Block A', count:42, pct:85, color:'#7c3aed' },
-  { name:'Block B', count:38, pct:75, color:'#06b6d4' },
-  { name:'Block C', count:27, pct:55, color:'#10b981' },
-  { name:'Block D', count:19, pct:40, color:'#ec4899' },
+  { name:'Block A', count:42, pct:85, color:'#2563eb' },
+  { name:'Block B', count:38, pct:75, color:'#0d9488' },
+  { name:'Block C', count:27, pct:55, color:'#059669' },
+  { name:'Block D', count:19, pct:40, color:'#be123c' },
 ];
 
 function exportCSV(data, filename) {
@@ -65,7 +65,7 @@ function ResWardenDashboard({ tickets, budget, ticketVolume7d, budgetBurn7d, t }
           <svg width={88} height={88} viewBox="0 0 88 88">
             <circle cx={44} cy={44} r={radius} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={8}/>
             <circle cx={44} cy={44} r={radius} fill="none" stroke="url(#rg1)" strokeWidth={8} strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ*(1-utilizationPct/100)} transform="rotate(-90 44 44)" style={{transition:'stroke-dashoffset 1.4s ease'}}/>
-            <defs><linearGradient id="rg1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#7c3aed"/><stop offset="100%" stopColor="#06b6d4"/></linearGradient></defs>
+            <defs><linearGradient id="rg1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#1d4ed8"/><stop offset="100%" stopColor="#2563eb"/></linearGradient></defs>
             <text x={44} y={44} textAnchor="middle" dominantBaseline="middle" fill="#f0f4ff" fontSize={13} fontWeight={700} fontFamily="Inter,sans-serif">{utilizationPct}%</text>
           </svg>
           <div><div className="kpi-label">{t('budget_used', 'Budget Used')}</div><div className="kpi-value" ref={budgetRef}>₹0</div><div className="kpi-sub">Monthly allocation</div></div>
@@ -80,9 +80,9 @@ function ResWardenDashboard({ tickets, budget, ticketVolume7d, budgetBurn7d, t }
         <div style={{ background:'var(--bg-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', padding:'18px' }}>
           <div className="flex-between" style={{marginBottom:10}}>
             <div className="section-title" style={{marginBottom:0}}>{t('ticket_trend', '7-Day Ticket Intake Trend')}</div>
-            <span style={{fontSize:11,color:'var(--accent-cyan)',fontWeight:700}}>+14% week-on-week</span>
+            <span style={{fontSize:11,color:'var(--accent-primary)',fontWeight:700}}>+14% week-on-week</span>
           </div>
-          <MiniTrendChart data={ticketVolume7d || [3, 5, 2, 8, 4, 6, 7]} width={360} height={76} color="var(--accent-cyan)" gradient={['#06b6d4', '#7c3aed']} showDots />
+          <MiniTrendChart data={ticketVolume7d || [3, 5, 2, 8, 4, 6, 7]} width={360} height={76} color="var(--accent-primary)" gradient={['#1d4ed8', '#2563eb']} showDots />
         </div>
 
         <div style={{ background:'var(--bg-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', padding:'18px' }}>
@@ -90,7 +90,7 @@ function ResWardenDashboard({ tickets, budget, ticketVolume7d, budgetBurn7d, t }
             <div className="section-title" style={{marginBottom:0}}>{t('budget_trend', 'Cumulative Budget Burn-down')}</div>
             <span style={{fontSize:11,color:'var(--accent-primary)',fontWeight:700}}>₹3.40L / ₹5.00L</span>
           </div>
-          <MiniTrendChart data={budgetBurn7d || [310000, 318000, 322000, 328000, 332000, 337000, 340000]} width={360} height={76} color="var(--accent-primary)" gradient={['#7c3aed', '#ec4899']} showDots />
+          <MiniTrendChart data={budgetBurn7d || [310000, 318000, 322000, 328000, 332000, 337000, 340000]} width={360} height={76} color="var(--accent-primary)" gradient={['#1e3a8a', '#2563eb']} showDots />
         </div>
       </div>
 
@@ -232,7 +232,7 @@ function ResWardenBudget({ budget, t }) {
   useEffect(()=>{ const tm=setTimeout(()=>setAnimated(true),300); return()=>clearTimeout(tm); },[]);
 
   const remaining = budget.total - budget.spent;
-  const COLORS    = ['#7c3aed','#06b6d4','#10b981','#f59e0b','#ec4899'];
+  const COLORS    = ['#2563eb','#0d9488','#059669','#d97706','#be123c'];
 
   return (
     <>

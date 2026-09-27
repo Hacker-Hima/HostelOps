@@ -78,6 +78,7 @@ export const api = {
     getUsers: () => request('/auth/users'),
     registerUser: (data) => request('/auth/register', { method: 'POST', body: data }),
     login: (credentials) => request('/auth/login', { method: 'POST', body: credentials }),
+    oauth: (payload) => request('/auth/oauth', { method: 'POST', body: payload }),
     getProfile: (params = '') => request(`/user/profile${params ? `?${params}` : ''}`),
     getMe: () => request('/auth/me'),
     updateProfile: (data) => request('/auth/profile', { method: 'PATCH', body: data }),
