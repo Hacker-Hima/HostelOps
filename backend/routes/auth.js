@@ -475,8 +475,9 @@ router.post('/auth/register', async (req, res) => {
     const cleanRoll = (roll_number || '').trim().toUpperCase();
     const cleanName = (name || '').trim();
     const cleanPass = (password || 'user@123').trim();
-    const assignedRole = ['user', 'staff', 'admin'].includes(role) ? role : 'user';
-    const assignedAdminType = assignedRole === 'admin' ? (admin_type || 'assetadmin') : '';
+    // Security: Public self-registration strictly forced to 'user' role to prevent privilege escalation
+    const assignedRole = 'user';
+    const assignedAdminType = '';
 
     if (!cleanUsername || cleanUsername.length < 3) {
       return res.status(400).json({ success: false, message: 'Username must be at least 3 characters long.' });
@@ -787,6 +788,65 @@ router.patch('/auth/users/:id', authenticate, requireRole('admin'), async (req, 
   } catch (err) {
     console.error('Admin update user error:', err);
     res.status(500).json({ success: false, message: 'Could not update user.', error: err.message });
+  }
+});
+
+// POST /api/auth/change-password — Secure authenticated password change
+router.post('/auth/change-password', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user.sub;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Both current password and new password are required.',
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters long.',
+      });
+    }
+
+    const user = await User.findOne({ id: userId }).select('+password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User account not found.' });
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch && user.password !== currentPassword) {
+      return res.status(401).json({
+        success: false,
+        message: 'Incorrect current password. Please verify and try again.',
+      });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    await AuditLog.create({
+      id: `AL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+      action: `Password Changed for user ${user.username}`,
+      actor: user.name,
+      target: user.id,
+      category: 'Auth',
+      timestamp: new Date().toLocaleString(),
+    }).catch(() => {});
+
+    res.json({
+      success: true,
+      message: 'Password updated successfully!',
+    });
+  } catch (err) {
+    console.error('Change password error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update password.',
+      error: err.message,
+    });
   }
 });
 

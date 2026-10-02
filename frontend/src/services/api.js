@@ -76,12 +76,15 @@ export const api = {
   auth: {
     getDemoAccounts: () => request('/auth/demo-accounts'),
     getUsers: () => request('/auth/users'),
+    createUser: (data) => request('/auth/users', { method: 'POST', body: data }),
     registerUser: (data) => request('/auth/register', { method: 'POST', body: data }),
     login: (credentials) => request('/auth/login', { method: 'POST', body: credentials }),
     oauth: (payload) => request('/auth/oauth', { method: 'POST', body: payload }),
     getProfile: (params = '') => request(`/user/profile${params ? `?${params}` : ''}`),
     getMe: () => request('/auth/me'),
     updateProfile: (data) => request('/auth/profile', { method: 'PATCH', body: data }),
+    changePassword: (data) => request('/auth/change-password', { method: 'POST', body: data }),
+    updateUser: (id, data) => request(`/auth/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: data }),
   },
 
   // ── 2. Asset Register ──

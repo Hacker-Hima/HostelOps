@@ -11,38 +11,95 @@ import {
 
 export default function StudentDashboard({ isMobile }) {
   const dispatch = useDispatch();
-  const { currentUser, assets, maintenanceTickets, assetRequests, notifications } = useSelector(
+  const { currentUser, assets, maintenanceTickets, assetRequests, transfers, categories, notifications } = useSelector(
     (s) => s.ticketStore
   );
 
-  const [activeSubTab, setActiveSubTab] = useState('my-assets'); // 'my-assets' | 'requests' | 'maintenance' | 'room'
+  const [activeSubTab, setActiveSubTab] = useState('my-assets'); // 'my-assets' | 'available-assets' | 'requests' | 'maintenance' | 'my-history'
 
   // Student's room assets
   const myAssets = useMemo(() => {
     return assets.filter(
       (a) =>
-        (a.assignedStudent?.roll && a.assignedStudent.roll === currentUser.roll_number) ||
-        (a.assigned_student_roll && a.assigned_student_roll === currentUser.roll_number) ||
-        (a.room === currentUser.room && a.block === currentUser.block)
+        (a.assignedStudent?.roll && a.assignedStudent.roll === currentUser?.roll_number) ||
+        (a.assigned_student_roll && a.assigned_student_roll === currentUser?.roll_number) ||
+        (a.room === currentUser?.room && a.block === currentUser?.block)
     );
   }, [assets, currentUser]);
+
+  // Available hostel assets in central store
+  const availableAssets = useMemo(() => {
+    return assets.filter((a) => a.status === 'In Store' || a.status === 'Available');
+  }, [assets]);
 
   // Student's maintenance tickets
   const myMaintenanceTickets = useMemo(() => {
     return maintenanceTickets.filter(
       (m) =>
-        m.reported_by?.includes(currentUser.name) ||
-        m.reported_by?.includes(currentUser.roll_number) ||
-        m.location?.includes(currentUser.room)
+        m.reported_by?.includes(currentUser?.name) ||
+        m.reported_by?.includes(currentUser?.roll_number) ||
+        m.location?.includes(currentUser?.room)
     );
   }, [maintenanceTickets, currentUser]);
 
   // Student's asset requests
   const myRequests = useMemo(() => {
     return assetRequests.filter(
-      (r) => r.student_roll === currentUser.roll_number || r.student_name === currentUser.name
+      (r) => r.student_roll === currentUser?.roll_number || r.student_name === currentUser?.name
     );
   }, [assetRequests, currentUser]);
+
+  // Student's personal asset history & lifecycle audit trail
+  const myHistory = useMemo(() => {
+    const list = [];
+    (transfers || []).forEach((t) => {
+      if (
+        t.from_student === currentUser?.name ||
+        t.to_student === currentUser?.name ||
+        t.from_location?.includes(currentUser?.room) ||
+        t.to_location?.includes(currentUser?.room)
+      ) {
+        list.push({
+          id: t.transfer_id,
+          type: 'Transfer',
+          title: `Asset ${t.asset_tag} (${t.asset_name || 'Item'}) Moved`,
+          detail: `From: ${t.from_location} → To: ${t.to_location}`,
+          date: t.date || 'Recent',
+          icon: '🔄',
+          badge: 'Transfer',
+          color: '#f59e0b',
+        });
+      }
+    });
+
+    (myMaintenanceTickets || []).forEach((m) => {
+      list.push({
+        id: m.ticket_id,
+        type: 'Maintenance',
+        title: `Maintenance: ${m.asset_name || m.asset_tag}`,
+        detail: `${m.issue_description} — Status: ${m.status}`,
+        date: m.reported_date || 'Recent',
+        icon: '🛠️',
+        badge: m.status,
+        color: m.status === 'Repaired' ? '#10b981' : '#ef4444',
+      });
+    });
+
+    (myRequests || []).forEach((r) => {
+      list.push({
+        id: r.request_id,
+        type: 'Requisition',
+        title: `Requisition: ${r.asset_name}`,
+        detail: `Category: ${r.asset_category} — Urgency: ${r.urgency}`,
+        date: r.request_date || 'Recent',
+        icon: '📥',
+        badge: r.status,
+        color: r.status === 'Approved' ? '#10b981' : r.status === 'Allocated' ? '#0284c7' : '#f59e0b',
+      });
+    });
+
+    return list.sort((a, b) => (b.date > a.date ? 1 : -1));
+  }, [transfers, myMaintenanceTickets, myRequests, currentUser]);
 
   // Recently Accessed Quick Items
   const [recentlyAccessed, setRecentlyAccessed] = useState(() => {
@@ -262,7 +319,23 @@ export default function StudentDashboard({ isMobile }) {
             cursor: 'pointer',
           }}
         >
-          🪑 My Allocated Assets ({myAssets.length})
+          🪑 My Room Assets ({myAssets.length})
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('available-assets')}
+          style={{
+            padding: '8px 18px',
+            borderRadius: '10px',
+            background: activeSubTab === 'available-assets' ? 'var(--accent-primary)' : 'transparent',
+            border: 'none',
+            color: activeSubTab === 'available-assets' ? '#fff' : 'var(--text-secondary)',
+            fontWeight: 700,
+            fontSize: '13px',
+            cursor: 'pointer',
+          }}
+        >
+          📦 Available Inventory ({availableAssets.length})
         </button>
 
         <button
@@ -278,7 +351,7 @@ export default function StudentDashboard({ isMobile }) {
             cursor: 'pointer',
           }}
         >
-          📥 My Asset Requests ({myRequests.length})
+          📥 My Requisitions ({myRequests.length})
         </button>
 
         <button
@@ -294,7 +367,23 @@ export default function StudentDashboard({ isMobile }) {
             cursor: 'pointer',
           }}
         >
-          🛠️ Maintenance Tickets ({myMaintenanceTickets.length})
+          🛠️ Maintenance ({myMaintenanceTickets.length})
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('my-history')}
+          style={{
+            padding: '8px 18px',
+            borderRadius: '10px',
+            background: activeSubTab === 'my-history' ? 'var(--accent-primary)' : 'transparent',
+            border: 'none',
+            color: activeSubTab === 'my-history' ? '#fff' : 'var(--text-secondary)',
+            fontWeight: 700,
+            fontSize: '13px',
+            cursor: 'pointer',
+          }}
+        >
+          📜 Asset History ({myHistory.length})
         </button>
       </div>
 
@@ -537,6 +626,199 @@ export default function StudentDashboard({ isMobile }) {
               No maintenance tickets reported for your room. All assets are operating smoothly!
             </div>
           )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          SUB-TAB 4: AVAILABLE ASSETS INVENTORY
+      ══════════════════════════════════════════════════════════════════ */}
+      {activeSubTab === 'available-assets' && (
+        <div>
+          <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                Hostel Central Store Inventory ({availableAssets.length} Items Available)
+              </h3>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                You can request any available asset below for allocation to your room.
+              </span>
+            </div>
+            <button
+              onClick={() => dispatch(setRequestAssetModalOpen(true))}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                background: 'var(--accent-primary)',
+                border: 'none',
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+            >
+              + Custom Requisition
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+            {availableAssets.map((asset) => (
+              <div
+                key={asset.tag}
+                style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-default)',
+                  borderRadius: '16px',
+                  padding: '18px',
+                  boxShadow: 'var(--shadow-card)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11.5px', fontFamily: 'monospace', fontWeight: 700, color: 'var(--text-accent)' }}>
+                      {asset.tag}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '10.5px',
+                        fontWeight: 700,
+                        padding: '2px 7px',
+                        borderRadius: '6px',
+                        background: 'rgba(16, 185, 129, 0.12)',
+                        color: '#10b981',
+                      }}
+                    >
+                      Available in Store
+                    </span>
+                  </div>
+
+                  <h4 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 6px 0' }}>
+                    {asset.name}
+                  </h4>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                    Category: <strong>{asset.category}</strong> • Condition: <strong>{asset.condition}</strong>
+                  </div>
+
+                  <div style={{ background: 'var(--bg-surface-glass)', padding: '10px', borderRadius: '8px', fontSize: '11.5px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+                    <div>📍 Location: {asset.location || 'Central Inventory Store'}</div>
+                    <div style={{ marginTop: '3px' }}>🛡️ Warranty: {asset.warrantyExpiry || 'Active'}</div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    dispatch(setRequestAssetModalOpen(true));
+                    dispatch(addToast({ id: `prefill-${Date.now()}`, message: `Requisition opened for ${asset.name}`, type: 'info' }));
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '9px',
+                    borderRadius: '8px',
+                    background: 'var(--accent-primary-soft)',
+                    border: '1px solid var(--border-default)',
+                    color: 'var(--text-primary)',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <span>✨</span>
+                  <span>Request This Item</span>
+                </button>
+              </div>
+            ))}
+
+            {availableAssets.length === 0 && (
+              <div style={{ gridColumn: '1 / -1', background: 'var(--bg-card)', padding: '36px', borderRadius: '16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                No assets currently available in the central store. Check back soon or submit a custom requisition.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          SUB-TAB 5: PERSONAL ASSET HISTORY & AUDIT TRAIL
+      ══════════════════════════════════════════════════════════════════ */}
+      {activeSubTab === 'my-history' && (
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: '16px', padding: '20px' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+              Personal Asset Activity & History
+            </h3>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              Complete record of all equipment movements, repair tickets, and requisitions for your room.
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {myHistory.map((h) => (
+              <div
+                key={h.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border-default)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '16px',
+                    }}
+                  >
+                    {h.icon}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>{h.title}</div>
+                    <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>{h.detail}</div>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      fontSize: '10.5px',
+                      fontWeight: 700,
+                      background: 'rgba(2, 132, 199, 0.1)',
+                      color: h.color || 'var(--text-accent)',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {h.badge}
+                  </span>
+                  <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>{h.date}</div>
+                </div>
+              </div>
+            ))}
+
+            {myHistory.length === 0 && (
+              <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                No past asset history recorded for your room yet.
+              </div>
+            )}
+          </div>
         </div>
       )}
 

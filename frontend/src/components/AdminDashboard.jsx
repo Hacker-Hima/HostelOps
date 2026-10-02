@@ -16,7 +16,10 @@ import {
   addToast,
   reviewAssetRequestAsync,
   updateMaintenanceAsync,
+  fetchInitialData,
+  createUserAsync,
 } from '../redux/ticketSlice';
+import api from '../services/api';
 
 export default function AdminDashboard({ isMobile }) {
   const dispatch = useDispatch();
@@ -46,6 +49,35 @@ export default function AdminDashboard({ isMobile }) {
   const [selectedAuditBlock, setSelectedAuditBlock] = useState('Block A');
   const [auditScannedTags, setAuditScannedTags] = useState([]);
   const [maintenanceFilter, setMaintenanceFilter] = useState('All');
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyCategory, setHistoryCategory] = useState('All');
+
+  const [assetPage, setAssetPage] = useState(1);
+  const assetPageSize = 10;
+  const [assetToDelete, setAssetToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showAddCatModal, setShowAddCatModal] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatIcon, setNewCatIcon] = useState('📦');
+  const [newCatDepRate, setNewCatDepRate] = useState(10);
+  const [newCatDesc, setNewCatDesc] = useState('');
+  const [isCreatingCat, setIsCreatingCat] = useState(false);
+
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [newUserData, setNewUserData] = useState({
+    username: '',
+    name: '',
+    role: 'user',
+    admin_type: '',
+    roll_number: '',
+    email: '',
+    phone: '',
+    room: '101',
+    block: 'Block A',
+    floor: 'Floor 1',
+    password: 'user@123',
+  });
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
 
   // Calculate high-level KPIs
   const totalValuation = useMemo(
@@ -91,6 +123,21 @@ export default function AdminDashboard({ isMobile }) {
       return matchCat && matchCond && matchStat && matchBlk && matchSearch;
     });
   }, [assets, selectedCat, selectedCond, selectedStat, selectedBlk, search]);
+
+  const totalAssetPages = Math.ceil(filteredAssets.length / assetPageSize) || 1;
+  const paginatedAssets = useMemo(() => {
+    const start = (assetPage - 1) * assetPageSize;
+    return filteredAssets.slice(start, start + assetPageSize);
+  }, [filteredAssets, assetPage, assetPageSize]);
+
+  const lowStockCategories = useMemo(() => {
+    return categories
+      .map((c) => {
+        const inStore = assets.filter((a) => a.category === c.name && (a.status === 'In Store' || a.status === 'Available')).length;
+        return { name: c.name, icon: c.icon, inStore };
+      })
+      .filter((c) => c.inStore <= 1);
+  }, [categories, assets]);
 
   // Recently Accessed Items (tracked across actions)
   const [recentlyAccessed, setRecentlyAccessed] = useState(() => {
@@ -156,6 +203,140 @@ export default function AdminDashboard({ isMobile }) {
     link.download = `Hostel_Asset_Register_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     dispatch(addToast({ id: `csv-${Date.now()}`, message: 'Asset Register CSV exported successfully!', type: 'success' }));
+  };
+
+  const handleConfirmDeleteAsset = async () => {
+    if (!assetToDelete) return;
+    setIsDeleting(true);
+    try {
+      await dispatch(deleteAssetAsync(assetToDelete.tag)).unwrap();
+      dispatch(addToast({ id: `del-${Date.now()}`, message: `Asset ${assetToDelete.tag} deleted successfully`, type: 'success' }));
+      setAssetToDelete(null);
+    } catch (err) {
+      dispatch(addToast({ id: `del-err-${Date.now()}`, message: err || 'Failed to delete asset', type: 'error' }));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCreateCategory = async (e) => {
+    e.preventDefault();
+    if (!newCatName.trim()) {
+      dispatch(addToast({ id: `cat-err-${Date.now()}`, message: 'Please enter category name', type: 'warn' }));
+      return;
+    }
+    setIsCreatingCat(true);
+    try {
+      await api.assets.createCategory({
+        name: newCatName.trim(),
+        icon: newCatIcon || '📦',
+        description: newCatDesc.trim(),
+        default_depreciation_rate: Number(newCatDepRate) || 10,
+      });
+      dispatch(addToast({ id: `cat-succ-${Date.now()}`, message: `Category "${newCatName}" created successfully!`, type: 'success' }));
+      setShowAddCatModal(false);
+      setNewCatName('');
+      setNewCatDesc('');
+      dispatch(fetchInitialData());
+    } catch (err) {
+      dispatch(addToast({ id: `cat-err-${Date.now()}`, message: err.message || 'Failed to create category', type: 'error' }));
+    } finally {
+      setIsCreatingCat(false);
+    }
+  };
+
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    if (!newUserData.username.trim() || !newUserData.name.trim() || !newUserData.email.trim()) {
+      dispatch(addToast({ id: `usr-err-${Date.now()}`, message: 'Username, Name, and Email are required', type: 'warn' }));
+      return;
+    }
+    setIsCreatingUser(true);
+    try {
+      await dispatch(createUserAsync(newUserData)).unwrap();
+      dispatch(addToast({ id: `usr-succ-${Date.now()}`, message: `User ${newUserData.username} created successfully!`, type: 'success' }));
+      setShowAddUserModal(false);
+      setNewUserData({
+        username: '',
+        name: '',
+        role: 'user',
+        admin_type: '',
+        roll_number: '',
+        email: '',
+        phone: '',
+        room: '101',
+        block: 'Block A',
+        floor: 'Floor 1',
+        password: 'user@123',
+      });
+    } catch (err) {
+      dispatch(addToast({ id: `usr-err-${Date.now()}`, message: err || 'Failed to create user', type: 'error' }));
+    } finally {
+      setIsCreatingUser(false);
+    }
+  };
+
+  // Asset History & Audit Trail Calculations
+  const historyCategories = useMemo(() => {
+    const cats = new Set();
+    (auditLogs || []).forEach((l) => {
+      if (l.category) cats.add(l.category);
+    });
+    return ['All', ...Array.from(cats)];
+  }, [auditLogs]);
+
+  const filteredHistory = useMemo(() => {
+    return (auditLogs || []).filter((log) => {
+      const matchCat = historyCategory === 'All' || log.category === historyCategory;
+      const term = historySearch.toLowerCase().trim();
+      const matchSearch =
+        !term ||
+        log.action?.toLowerCase().includes(term) ||
+        log.actor?.toLowerCase().includes(term) ||
+        log.target?.toLowerCase().includes(term) ||
+        log.id?.toLowerCase().includes(term);
+      return matchCat && matchSearch;
+    });
+  }, [auditLogs, historyCategory, historySearch]);
+
+  const handleExportHistoryCSV = () => {
+    const headers = 'Log ID,Action,Target Asset/Entity,Actor,Category,Timestamp\n';
+    const rows = filteredHistory
+      .map(
+        (h) =>
+          `"${h.id || ''}","${(h.action || '').replace(/"/g, '""')}","${(h.target || '').replace(/"/g, '""')}","${(h.actor || '').replace(/"/g, '""')}","${h.category || ''}","${h.timestamp || ''}"`
+      )
+      .join('\n');
+    const blob = new Blob([headers + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Hostel_Asset_History_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    dispatch(addToast({ id: `history-csv-${Date.now()}`, message: 'Asset History CSV exported successfully!', type: 'success' }));
+  };
+
+  const getCategoryBadgeStyle = (category) => {
+    switch (category?.toLowerCase()) {
+      case 'allocation':
+        return { bg: 'rgba(16, 185, 129, 0.12)', border: 'rgba(16, 185, 129, 0.3)', color: '#10b981', icon: '📍' };
+      case 'transfer':
+        return { bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.3)', color: '#f59e0b', icon: '🔄' };
+      case 'maintenance':
+        return { bg: 'rgba(239, 68, 68, 0.12)', border: 'rgba(239, 68, 68, 0.3)', color: '#ef4444', icon: '🛠️' };
+      case 'audit':
+        return { bg: 'rgba(14, 165, 233, 0.12)', border: 'rgba(14, 165, 233, 0.3)', color: '#0ea5e9', icon: '🔍' };
+      case 'disposal':
+        return { bg: 'rgba(168, 85, 247, 0.12)', border: 'rgba(168, 85, 247, 0.3)', color: '#a855f7', icon: '♻️' };
+      case 'asset':
+        return { bg: 'rgba(59, 130, 246, 0.12)', border: 'rgba(59, 130, 246, 0.3)', color: '#3b82f6', icon: '📦' };
+      case 'request':
+        return { bg: 'rgba(236, 72, 153, 0.12)', border: 'rgba(236, 72, 153, 0.3)', color: '#ec4899', icon: '📥' };
+      case 'auth':
+        return { bg: 'rgba(99, 102, 241, 0.12)', border: 'rgba(99, 102, 241, 0.3)', color: '#6366f1', icon: '🔑' };
+      default:
+        return { bg: 'rgba(148, 163, 184, 0.12)', border: 'rgba(148, 163, 184, 0.3)', color: '#94a3b8', icon: '📜' };
+    }
   };
 
   return (
@@ -515,6 +696,49 @@ export default function AdminDashboard({ isMobile }) {
       {activeTab === 'register' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
+          {/* Low Stock Inventory Alert (Phase 5 Requirement 6) */}
+          {lowStockCategories.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 18px',
+                borderRadius: '12px',
+                background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.12), rgba(239, 68, 68, 0.08))',
+                border: '1px solid rgba(245, 158, 11, 0.35)',
+                color: 'var(--text-primary)',
+                fontSize: '12px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '20px' }}>⚠️</span>
+                <div>
+                  <strong style={{ color: '#d97706' }}>Low Stock Inventory Alert:</strong>
+                  <span style={{ marginLeft: '6px', color: 'var(--text-secondary)' }}>
+                    Buffer below safety threshold: {lowStockCategories.map((c) => `${c.icon || '📦'} ${c.name} (${c.inStore} in store)`).join(' · ')}.
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => dispatch(setNewAssetModalOpen(true))}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  background: '#d97706',
+                  color: '#fff',
+                  border: 'none',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                + Register Stock
+              </button>
+            </div>
+          )}
+
           {/* Controls Bar */}
           <div
             style={{
@@ -535,7 +759,10 @@ export default function AdminDashboard({ isMobile }) {
                 type="text"
                 placeholder="Search tag, asset, room, or student..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setAssetPage(1);
+                }}
                 style={{
                   width: '100%',
                   padding: '7px 12px 7px 32px',
@@ -556,7 +783,10 @@ export default function AdminDashboard({ isMobile }) {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               <select
                 value={selectedCat}
-                onChange={(e) => setSelectedCat(e.target.value)}
+                onChange={(e) => {
+                  setSelectedCat(e.target.value);
+                  setAssetPage(1);
+                }}
                 style={{ padding: '7px 10px', borderRadius: '8px', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer' }}
               >
                 <option value="All">All Categories</option>
@@ -567,7 +797,10 @@ export default function AdminDashboard({ isMobile }) {
 
               <select
                 value={selectedCond}
-                onChange={(e) => setSelectedCond(e.target.value)}
+                onChange={(e) => {
+                  setSelectedCond(e.target.value);
+                  setAssetPage(1);
+                }}
                 style={{ padding: '7px 10px', borderRadius: '8px', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer' }}
               >
                 <option value="All">All Conditions</option>
@@ -580,7 +813,10 @@ export default function AdminDashboard({ isMobile }) {
 
               <select
                 value={selectedStat}
-                onChange={(e) => setSelectedStat(e.target.value)}
+                onChange={(e) => {
+                  setSelectedStat(e.target.value);
+                  setAssetPage(1);
+                }}
                 style={{ padding: '7px 10px', borderRadius: '8px', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer' }}
               >
                 <option value="All">All Statuses</option>
@@ -593,7 +829,10 @@ export default function AdminDashboard({ isMobile }) {
 
               <select
                 value={selectedBlk}
-                onChange={(e) => setSelectedBlk(e.target.value)}
+                onChange={(e) => {
+                  setSelectedBlk(e.target.value);
+                  setAssetPage(1);
+                }}
                 style={{ padding: '7px 10px', borderRadius: '8px', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-primary)', fontSize: '11.5px', cursor: 'pointer' }}
               >
                 <option value="All">All Blocks</option>
@@ -652,7 +891,7 @@ export default function AdminDashboard({ isMobile }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAssets.map((asset) => {
+                  {paginatedAssets.map((asset) => {
                     const cost = asset.purchaseCost || asset.purchase_cost || 0;
                     const val = asset.currentValue || asset.current_value || cost * 0.9;
                     const student = asset.assignedStudent?.name || asset.assigned_student_name;
@@ -765,6 +1004,34 @@ export default function AdminDashboard({ isMobile }) {
                         </td>
                         <td style={{ padding: '10px 12px', textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', gap: '5px' }}>
+                            {/* Allocate if in store */}
+                            {(asset.status === 'In Store' || asset.status === 'Available') && (
+                              <button
+                                onClick={() => {
+                                  dispatch(setSelectedAssetTag(asset.tag));
+                                  dispatch(setAllocateModalOpen(true));
+                                }}
+                                style={{ padding: '4px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.25)', cursor: 'pointer', fontSize: '11px', color: '#10b981', fontWeight: 600 }}
+                                title="Allocate asset to student"
+                              >
+                                📍 Allocate
+                              </button>
+                            )}
+
+                            {/* Return if assigned */}
+                            {asset.status === 'Assigned' && (
+                              <button
+                                onClick={() => {
+                                  dispatch(setSelectedAssetTag(asset.tag));
+                                  dispatch(setReturnModalOpen(true));
+                                }}
+                                style={{ padding: '4px 8px', borderRadius: '6px', background: 'rgba(6, 182, 212, 0.12)', border: '1px solid rgba(6, 182, 212, 0.25)', cursor: 'pointer', fontSize: '11px', color: '#06b6d4', fontWeight: 600 }}
+                                title="Return asset to store"
+                              >
+                                📥 Return
+                              </button>
+                            )}
+
                             <button
                               onClick={() => {
                                 dispatch(setSelectedAssetTag(asset.tag));
@@ -785,7 +1052,7 @@ export default function AdminDashboard({ isMobile }) {
                             >
                               🛠️ Repair
                             </button>
-                            {asset.condition === 'Beyond Repair' && (
+                            {(asset.condition === 'Damaged' || asset.condition === 'Beyond Repair') && asset.status !== 'Disposed' && (
                               <button
                                 onClick={() => {
                                   dispatch(setSelectedAssetTag(asset.tag));
@@ -797,6 +1064,13 @@ export default function AdminDashboard({ isMobile }) {
                                 ♻️ Scrap
                               </button>
                             )}
+                            <button
+                              onClick={() => setAssetToDelete(asset)}
+                              style={{ padding: '4px 8px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}
+                              title="Delete asset record"
+                            >
+                              🗑️
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -812,6 +1086,65 @@ export default function AdminDashboard({ isMobile }) {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls (Phase 5 Requirement 14) */}
+            {filteredAssets.length > 0 && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 18px',
+                  borderTop: '1px solid var(--border-subtle)',
+                  background: 'var(--bg-surface)',
+                  fontSize: '12px',
+                }}
+              >
+                <div style={{ color: 'var(--text-muted)' }}>
+                  Showing <strong>{(assetPage - 1) * assetPageSize + 1}</strong> to <strong>{Math.min(assetPage * assetPageSize, filteredAssets.length)}</strong> of <strong>{filteredAssets.length}</strong> assets
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    onClick={() => setAssetPage((p) => Math.max(1, p - 1))}
+                    disabled={assetPage === 1}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border-default)',
+                      color: assetPage === 1 ? 'var(--text-muted)' : 'var(--text-primary)',
+                      cursor: assetPage === 1 ? 'not-allowed' : 'pointer',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    ← Previous
+                  </button>
+
+                  <span style={{ fontSize: '12px', fontWeight: 700, padding: '0 8px', color: 'var(--text-primary)' }}>
+                    Page {assetPage} of {totalAssetPages}
+                  </span>
+
+                  <button
+                    onClick={() => setAssetPage((p) => Math.min(totalAssetPages, p + 1))}
+                    disabled={assetPage >= totalAssetPages}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border-default)',
+                      color: assetPage >= totalAssetPages ? 'var(--text-muted)' : 'var(--text-primary)',
+                      cursor: assetPage >= totalAssetPages ? 'not-allowed' : 'pointer',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -820,7 +1153,47 @@ export default function AdminDashboard({ isMobile }) {
           TAB 2: CATEGORIES MANAGEMENT
       ══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'categories' && (
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-default)',
+              borderRadius: '14px',
+              padding: '14px 20px',
+            }}
+          >
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                🏷️ Institutional Asset Categories ({categories.length})
+              </h3>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Classification, annual depreciation schedules, and inventory buffer allocations.
+              </span>
+            </div>
+            <button
+              onClick={() => setShowAddCatModal(true)}
+              style={{
+                padding: '9px 18px',
+                borderRadius: '8px',
+                background: 'var(--accent-primary)',
+                border: 'none',
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: '12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <span>+</span>
+              <span>Add Category</span>
+            </button>
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '18px' }}>
             {categories.map((cat) => {
               const catAssets = assets.filter((a) => a.category === cat.name);
@@ -1452,7 +1825,449 @@ export default function AdminDashboard({ isMobile }) {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════
-          TAB 6: INVENTORY PHYSICAL AUDIT
+          TAB 6: ASSET HISTORY & AUDIT TRAIL
+      ══════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'history' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          {/* Header & Quick Action Strip */}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '12px',
+              background: 'var(--bg-card)',
+              padding: '14px 18px',
+              borderRadius: '14px',
+              border: '1px solid var(--border-default)',
+              boxShadow: '0 2px 8px rgba(2, 132, 199, 0.04)',
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '20px' }}>📜</span>
+                <h3 style={{ fontSize: '17px', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                  Asset History & Institutional Audit Trail
+                </h3>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: '20px',
+                    background: 'var(--accent-primary-soft)',
+                    color: 'var(--accent-primary)',
+                    border: '1px solid rgba(2, 132, 199, 0.25)',
+                  }}
+                >
+                  {auditLogs.length} Events Logged
+                </span>
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                Immutable chronological event trail recording lifecycle movements, allocations, repairs, audits, and governance actions.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {(historySearch || historyCategory !== 'All') && (
+                <button
+                  onClick={() => {
+                    setHistorySearch('');
+                    setHistoryCategory('All');
+                  }}
+                  style={{
+                    padding: '7px 12px',
+                    borderRadius: '8px',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-default)',
+                    color: 'var(--text-muted)',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Clear Filters
+                </button>
+              )}
+
+              <button
+                onClick={handleExportHistoryCSV}
+                style={{
+                  padding: '7px 14px',
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%)',
+                  border: 'none',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: '11.5px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)',
+                }}
+              >
+                <span>📥</span>
+                <span>Export CSV</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Metric Cards Strip */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+              gap: '10px',
+            }}
+          >
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: '12px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>Total Records</div>
+              <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>{auditLogs.length}</div>
+              <div style={{ fontSize: '10.5px', color: '#0284c7', marginTop: '2px' }}>System Lifetime</div>
+            </div>
+
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: '12px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>Movements & Transfers</div>
+              <div style={{ fontSize: '20px', fontWeight: 800, color: '#10b981', marginTop: '2px' }}>
+                {auditLogs.filter((l) => /allocation|transfer/i.test(l.category || '')).length}
+              </div>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Custody changes</div>
+            </div>
+
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: '12px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>Maintenance Events</div>
+              <div style={{ fontSize: '20px', fontWeight: 800, color: '#f59e0b', marginTop: '2px' }}>
+                {auditLogs.filter((l) => /maintenance|repair/i.test(l.category || '')).length}
+              </div>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Repairs & Tickets</div>
+            </div>
+
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: '12px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>Audits & Checks</div>
+              <div style={{ fontSize: '20px', fontWeight: 800, color: '#0ea5e9', marginTop: '2px' }}>
+                {auditLogs.filter((l) => /audit/i.test(l.category || '')).length}
+              </div>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Physical scans</div>
+            </div>
+
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: '12px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>Filtered Results</div>
+              <div style={{ fontSize: '20px', fontWeight: 800, color: '#8b5cf6', marginTop: '2px' }}>
+                {filteredHistory.length}
+              </div>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Current View</div>
+            </div>
+          </div>
+
+          {/* Search & Category Filter Bar */}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px',
+              background: 'var(--bg-card)',
+              padding: '10px 14px',
+              borderRadius: '12px',
+              border: '1px solid var(--border-default)',
+            }}
+          >
+            {/* Search Input */}
+            <div style={{ flex: '1 1 240px', position: 'relative' }}>
+              <input
+                type="text"
+                placeholder="Search action description, target tag (e.g. AST-101), actor, or ID..."
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '7px 12px 7px 32px',
+                  borderRadius: '8px',
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-default)',
+                  color: 'var(--text-primary)',
+                  fontSize: '12.5px',
+                  outline: 'none',
+                }}
+              />
+              <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '13px' }}>
+                🔍
+              </span>
+              {historySearch && (
+                <button
+                  onClick={() => setHistorySearch('')}
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Quick Category Chips */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, marginRight: '2px' }}>
+                Category:
+              </span>
+              {['All', 'Allocation', 'Transfer', 'Maintenance', 'Audit', 'Disposal', 'Asset'].map((cat) => {
+                const isSelected = historyCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setHistoryCategory(cat)}
+                    style={{
+                      padding: '4px 9px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      background: isSelected ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                      color: isSelected ? '#ffffff' : 'var(--text-secondary)',
+                      border: `1px solid ${isSelected ? 'var(--accent-primary)' : 'var(--border-default)'}`,
+                    }}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+
+              {/* More Categories Dropdown if any extra exist */}
+              {historyCategories.length > 7 && (
+                <select
+                  value={historyCategories.includes(historyCategory) ? historyCategory : 'All'}
+                  onChange={(e) => setHistoryCategory(e.target.value)}
+                  style={{
+                    padding: '5px 8px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-default)',
+                    color: 'var(--text-primary)',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="All">All Categories</option>
+                  {historyCategories
+                    .filter((c) => c !== 'All')
+                    .map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                </select>
+              )}
+            </div>
+          </div>
+
+          {/* History Event Logs Table */}
+          <div
+            style={{
+              background: 'var(--bg-card)',
+              borderRadius: '14px',
+              border: '1px solid var(--border-default)',
+              overflow: 'hidden',
+              boxShadow: '0 2px 8px rgba(2, 132, 199, 0.05)',
+            }}
+          >
+            <div
+              style={{
+                padding: '12px 16px',
+                borderBottom: '1px solid var(--border-default)',
+                fontWeight: 700,
+                fontSize: '13px',
+                color: 'var(--text-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>📋</span>
+                <span>Audit Trail Records ({filteredHistory.length})</span>
+              </div>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>
+                Showing latest records first • Click an asset tag to inspect details
+              </span>
+            </div>
+
+            {filteredHistory.length === 0 ? (
+              <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '36px', marginBottom: '10px' }}>🔍</div>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  No History Records Found
+                </div>
+                <div style={{ fontSize: '12px', maxWidth: '360px', margin: '0 auto 16px auto' }}>
+                  {historySearch || historyCategory !== 'All'
+                    ? 'No events match your current filter parameters. Try clearing your search query or choosing another category.'
+                    : 'No audit records have been logged in the system yet.'}
+                </div>
+                {(historySearch || historyCategory !== 'All') && (
+                  <button
+                    onClick={() => {
+                      setHistorySearch('');
+                      setHistoryCategory('All');
+                    }}
+                    style={{
+                      padding: '7px 14px',
+                      borderRadius: '8px',
+                      background: 'var(--accent-primary)',
+                      color: '#fff',
+                      border: 'none',
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Reset Filter
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <table style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-default)', color: 'var(--text-secondary)' }}>
+                      <th style={{ padding: '10px 14px', fontWeight: 700, width: '130px' }}>Log ID</th>
+                      <th style={{ padding: '10px 14px', fontWeight: 700, width: '150px' }}>Timestamp</th>
+                      <th style={{ padding: '10px 14px', fontWeight: 700, width: '130px' }}>Category</th>
+                      <th style={{ padding: '10px 14px', fontWeight: 700 }}>Action Description</th>
+                      <th style={{ padding: '10px 14px', fontWeight: 700, width: '160px' }}>Target Entity</th>
+                      <th style={{ padding: '10px 14px', fontWeight: 700, width: '160px' }}>Authorized By</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredHistory.map((log) => {
+                      const badge = getCategoryBadgeStyle(log.category);
+                      const isAssetTag =
+                        assets.some((a) => a.tag === log.target) ||
+                        (log.target && /^(AST-|TKT-|AUD-|DIS-)/i.test(log.target));
+
+                      return (
+                        <tr
+                          key={log.id || `${log.timestamp}-${Math.random()}`}
+                          style={{
+                            borderBottom: '1px solid var(--border-subtle)',
+                            transition: 'background 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          {/* Log ID */}
+                          <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontWeight: 700, color: 'var(--accent-primary)', fontSize: '11.5px' }}>
+                            {log.id || 'AL-SYS'}
+                          </td>
+
+                          {/* Timestamp */}
+                          <td style={{ padding: '10px 14px', color: 'var(--text-muted)', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <span>🕒</span>
+                              <span>{log.timestamp || 'Recent'}</span>
+                            </div>
+                          </td>
+
+                          {/* Category Badge */}
+                          <td style={{ padding: '10px 14px' }}>
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                background: badge.bg,
+                                color: badge.color,
+                                border: `1px solid ${badge.border}`,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <span>{badge.icon}</span>
+                              <span>{log.category || 'System'}</span>
+                            </span>
+                          </td>
+
+                          {/* Action Description */}
+                          <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                            {log.action}
+                          </td>
+
+                          {/* Target Asset / Entity */}
+                          <td style={{ padding: '10px 14px' }}>
+                            {isAssetTag ? (
+                              <button
+                                onClick={() => {
+                                  dispatch(setSelectedAssetTag(log.target));
+                                  dispatch(setQrPreviewTag(log.target));
+                                  recordAccess({
+                                    id: log.target,
+                                    type: 'asset',
+                                    icon: '📦',
+                                    title: log.target,
+                                    subtitle: 'History Target',
+                                  });
+                                }}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '3px 8px',
+                                  borderRadius: '6px',
+                                  background: 'rgba(2, 132, 199, 0.1)',
+                                  border: '1px solid rgba(2, 132, 199, 0.25)',
+                                  color: '#0284c7',
+                                  fontFamily: 'monospace',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                }}
+                                title="Click to view Asset details & QR Code"
+                              >
+                                <span>🏷️</span>
+                                <span>{log.target}</span>
+                              </button>
+                            ) : (
+                              <span style={{ fontFamily: 'monospace', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '11.5px' }}>
+                                {log.target || 'General'}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Actor */}
+                          <td style={{ padding: '10px 14px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <span style={{ fontSize: '12px' }}>👤</span>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {log.actor || 'System Admin'}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          TAB 7: INVENTORY PHYSICAL AUDIT
       ══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'audit' && (
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: '24px' }}>
@@ -1869,8 +2684,31 @@ export default function AdminDashboard({ isMobile }) {
       {activeTab === 'users' && adminType === 'superadmin' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ background: 'var(--bg-card)', borderRadius: '14px', border: '1px solid var(--border-default)', overflow: 'hidden', boxShadow: '0 2px 8px rgba(2, 132, 199, 0.05)' }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-default)', fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>
-              System Accounts & Access Governance ({usersList.length || 6} Registered)
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-default)', fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>👥</span>
+                <span>System Accounts & Access Governance ({usersList.length || 6} Registered)</span>
+              </div>
+              <button
+                onClick={() => setShowAddUserModal(true)}
+                style={{
+                  background: 'var(--primary)',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '7px 14px',
+                  borderRadius: '7px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                }}
+              >
+                <span>➕</span>
+                <span>Add User / Admin</span>
+              </button>
             </div>
             <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
@@ -1894,7 +2732,7 @@ export default function AdminDashboard({ isMobile }) {
                           {u.admin_type || u.role}
                         </span>
                       </td>
-                      <td style={{ padding: '10px 14px' }}>{u.block} - {u.room}</td>
+                      <td style={{ padding: '10px 14px' }}>{u.block || 'Hostel'} - {u.room || 'General'}</td>
                       <td style={{ padding: '10px 14px', color: 'var(--text-muted)' }}>{u.email}</td>
                       <td style={{ padding: '10px 14px', color: 'var(--text-muted)' }}>{u.phone}</td>
                     </tr>
@@ -1908,6 +2746,299 @@ export default function AdminDashboard({ isMobile }) {
 
         </main>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          CONFIRM DELETE ASSET MODAL
+      ══════════════════════════════════════════════════════════════════ */}
+      {assetToDelete && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-default)', maxWidth: '440px', width: '100%', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.3)', animation: 'fadeIn 0.2s ease-out' }}>
+            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', marginBottom: '14px', color: '#ef4444' }}>
+              ⚠️
+            </div>
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 8px 0' }}>
+              Confirm Asset Deletion
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5, margin: '0 0 16px 0' }}>
+              Are you sure you want to permanently delete <strong style={{ color: 'var(--text-primary)' }}>{assetToDelete.tag}</strong> ({assetToDelete.name})? This will remove the asset and its lifecycle tracking records from the database.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setAssetToDelete(null)}
+                disabled={isDeleting}
+                style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteAsset}
+                disabled={isDeleting}
+                style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: isDeleting ? 'not-allowed' : 'pointer', opacity: isDeleting ? 0.7 : 1 }}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          CREATE ASSET CATEGORY MODAL
+      ══════════════════════════════════════════════════════════════════ */}
+      {showAddCatModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-default)', maxWidth: '460px', width: '100%', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.3)', animation: 'fadeIn 0.2s ease-out' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '17px', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>🏷️</span> Add Asset Category
+              </h3>
+              <button onClick={() => setShowAddCatModal(false)} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: 'var(--text-muted)' }}>✕</button>
+            </div>
+
+            <form onSubmit={handleCreateCategory} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Category Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Sports Equipment, Laboratory Devices"
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Icon Emoji</label>
+                  <input
+                    type="text"
+                    value={newCatIcon}
+                    onChange={(e) => setNewCatIcon(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Depreciation (%/yr)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={newCatDepRate}
+                    onChange={(e) => setNewCatDepRate(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Description</label>
+                <textarea
+                  rows="3"
+                  placeholder="Optional brief description of items in this category"
+                  value={newCatDesc}
+                  onChange={(e) => setNewCatDesc(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px', boxSizing: 'border-box', resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCatModal(false)}
+                  disabled={isCreatingCat}
+                  style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingCat}
+                  style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: isCreatingCat ? 'not-allowed' : 'pointer', opacity: isCreatingCat ? 0.7 : 1 }}
+                >
+                  {isCreatingCat ? 'Saving...' : 'Create Category'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          REGISTER INSTITUTIONAL USER / ADMIN MODAL
+      ══════════════════════════════════════════════════════════════════ */}
+      {showAddUserModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-default)', maxWidth: '520px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.3)', animation: 'fadeIn 0.2s ease-out' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '17px', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>👥</span> Register Institutional Account
+              </h3>
+              <button onClick={() => setShowAddUserModal(false)} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: 'var(--text-muted)' }}>✕</button>
+            </div>
+
+            <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Username / ID *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. STU-2026-09 or adm_rahul"
+                    value={newUserData.username}
+                    onChange={(e) => setNewUserData({ ...newUserData, username: e.target.value })}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Rahul Sharma"
+                    value={newUserData.name}
+                    onChange={(e) => setNewUserData({ ...newUserData, name: e.target.value })}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Account Role *</label>
+                  <select
+                    value={newUserData.role}
+                    onChange={(e) => setNewUserData({ ...newUserData, role: e.target.value, admin_type: e.target.value === 'admin' ? 'logistics' : '' })}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px', boxSizing: 'border-box' }}
+                  >
+                    <option value="user">Student / Resident (User)</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                </div>
+                {newUserData.role === 'admin' ? (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Admin Authority *</label>
+                    <select
+                      value={newUserData.admin_type || 'logistics'}
+                      onChange={(e) => setNewUserData({ ...newUserData, admin_type: e.target.value })}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px', boxSizing: 'border-box' }}
+                    >
+                      <option value="logistics">Logistics & Asset Admin</option>
+                      <option value="superadmin">Super Administrator</option>
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Roll / Matric Number</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 23BCE1042"
+                      value={newUserData.roll_number}
+                      onChange={(e) => setNewUserData({ ...newUserData, roll_number: e.target.value })}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Email Address *</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="user@hostel.edu"
+                    value={newUserData.email}
+                    onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Phone Number</label>
+                  <input
+                    type="tel"
+                    placeholder="+91 9876543210"
+                    value={newUserData.phone}
+                    onChange={(e) => setNewUserData({ ...newUserData, phone: e.target.value })}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Block</label>
+                  <select
+                    value={newUserData.block}
+                    onChange={(e) => setNewUserData({ ...newUserData, block: e.target.value })}
+                    style={{ width: '100%', padding: '9px 10px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '12.5px', boxSizing: 'border-box' }}
+                  >
+                    <option value="Block A">Block A</option>
+                    <option value="Block B">Block B</option>
+                    <option value="Block C">Block C</option>
+                    <option value="Block D">Block D</option>
+                    <option value="Admin Block">Admin Block</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Room</label>
+                  <input
+                    type="text"
+                    value={newUserData.room}
+                    onChange={(e) => setNewUserData({ ...newUserData, room: e.target.value })}
+                    style={{ width: '100%', padding: '9px 10px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '12.5px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Floor</label>
+                  <select
+                    value={newUserData.floor}
+                    onChange={(e) => setNewUserData({ ...newUserData, floor: e.target.value })}
+                    style={{ width: '100%', padding: '9px 10px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '12.5px', boxSizing: 'border-box' }}
+                  >
+                    <option value="Ground">Ground</option>
+                    <option value="Floor 1">Floor 1</option>
+                    <option value="Floor 2">Floor 2</option>
+                    <option value="Floor 3">Floor 3</option>
+                    <option value="Floor 4">Floor 4</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Initial Temporary Password *</label>
+                <input
+                  type="text"
+                  required
+                  value={newUserData.password}
+                  onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowAddUserModal(false)}
+                  disabled={isCreatingUser}
+                  style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingUser}
+                  style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: isCreatingUser ? 'not-allowed' : 'pointer', opacity: isCreatingUser ? 0.7 : 1 }}
+                >
+                  {isCreatingUser ? 'Creating...' : 'Register User'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

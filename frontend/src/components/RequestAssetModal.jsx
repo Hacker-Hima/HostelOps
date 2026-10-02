@@ -4,7 +4,7 @@ import { setRequestAssetModalOpen, submitAssetRequestAsync, addToast } from '../
 
 export default function RequestAssetModal() {
   const dispatch = useDispatch();
-  const { requestAssetModalOpen, currentUser } = useSelector((s) => s.ticketStore);
+  const { requestAssetModalOpen, currentUser, categories } = useSelector((s) => s.ticketStore);
 
   const [assetCategory, setAssetCategory] = useState('Study Equipment');
   const [assetName, setAssetName] = useState('LED Flexible Desk Study Lamp');
@@ -16,7 +16,7 @@ export default function RequestAssetModal() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!assetName.trim() || !reason.trim()) {
-      alert('Please fill in asset name and reason');
+      dispatch(addToast({ id: `req-warn-${Date.now()}`, message: 'Please fill in both asset name and purpose.', type: 'warn' }));
       return;
     }
 
@@ -37,7 +37,7 @@ export default function RequestAssetModal() {
       dispatch(addToast({ id: `req-${Date.now()}`, message: 'Requisition submitted for approval!', type: 'success' }));
       dispatch(setRequestAssetModalOpen(false));
     } catch (err) {
-      alert('Requisition failed: ' + err);
+      dispatch(addToast({ id: `req-err-${Date.now()}`, message: 'Requisition failed: ' + err, type: 'error' }));
     }
   };
 
@@ -63,11 +63,21 @@ export default function RequestAssetModal() {
                 onChange={(e) => setAssetCategory(e.target.value)}
                 style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'var(--bg-card)', border: '1px solid var(--border-default)', color: 'var(--text-primary)' }}
               >
-                <option>Study Equipment</option>
-                <option>Furniture</option>
-                <option>Electrical</option>
-                <option>Electronics</option>
-                <option>Appliances</option>
+                {categories && categories.length > 0 ? (
+                  categories.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.icon || '📦'} {c.name}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option>Study Equipment</option>
+                    <option>Furniture</option>
+                    <option>Electrical</option>
+                    <option>Electronics</option>
+                    <option>Appliances</option>
+                  </>
+                )}
               </select>
             </div>
 

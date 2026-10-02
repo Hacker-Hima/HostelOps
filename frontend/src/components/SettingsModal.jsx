@@ -5,6 +5,7 @@ import {
   setLayoutMode, setLanguage, setViewMode,
   setFontStyle, setFontSize,
   logout, setRole, addToast, updateUserProfile,
+  updateProfileAsync, changePasswordAsync,
 } from '../redux/ticketSlice';
 import { useTranslation } from '../utils/translations';
 
@@ -71,7 +72,58 @@ export default function SettingsModal({ isOpen, onClose }) {
     currentUser, isBackendConnected, fontStyle, fontSize } = useSelector((s) => s.ticketStore);
   const [activeTab, setActiveTab] = useState('appearance');
 
-  if (!isOpen) return null;
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPass, setIsChangingPass] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  const handleSaveProfile = async () => {
+    const name = document.getElementById('settings-edit-name')?.value?.trim();
+    const room = document.getElementById('settings-edit-room')?.value?.trim();
+    const phone = document.getElementById('settings-edit-phone')?.value?.trim();
+    const email = document.getElementById('settings-edit-email')?.value?.trim();
+
+    setIsSavingProfile(true);
+    try {
+      await dispatch(updateProfileAsync({ name, room, phone, email })).unwrap();
+      dispatch(updateUserProfile({ name, room, phone, email }));
+      dispatch(addToast({ id: `profile-toast-${Date.now()}`, message: 'User profile updated and saved to database!', type: 'success' }));
+    } catch (err) {
+      dispatch(addToast({ id: `profile-err-${Date.now()}`, message: err || 'Failed to update profile', type: 'error' }));
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword) {
+      dispatch(addToast({ id: `pass-err-${Date.now()}`, message: 'Please enter both current and new password', type: 'warn' }));
+      return;
+    }
+    if (newPassword.length < 6) {
+      dispatch(addToast({ id: `pass-err-${Date.now()}`, message: 'New password must be at least 6 characters long', type: 'warn' }));
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      dispatch(addToast({ id: `pass-err-${Date.now()}`, message: 'New passwords do not match', type: 'warn' }));
+      return;
+    }
+
+    setIsChangingPass(true);
+    try {
+      await dispatch(changePasswordAsync({ currentPassword, newPassword })).unwrap();
+      dispatch(addToast({ id: `pass-succ-${Date.now()}`, message: 'Password updated successfully!', type: 'success' }));
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      dispatch(addToast({ id: `pass-err-${Date.now()}`, message: err || 'Failed to change password. Please verify current password.', type: 'error' }));
+    } finally {
+      setIsChangingPass(false);
+    }
+  };
 
   const handleReset = () => {
     dispatch(setThemeMode('light'));
@@ -93,6 +145,8 @@ export default function SettingsModal({ isOpen, onClose }) {
     borderRadius:'var(--radius-sm)', background:'transparent', color:'var(--text-muted)',
     cursor:'pointer', fontSize:13, display:'flex', alignItems:'center', justifyContent:'center',
     transition:'all 0.15s', fontFamily:'var(--font-main)' };
+
+  if (!isOpen) return null;
 
   return (
     <>
@@ -388,19 +442,76 @@ export default function SettingsModal({ isOpen, onClose }) {
                     <button
                       type="button"
                       className="btn btn-primary btn-sm btn-full"
-                      onClick={() => {
-                        const name = document.getElementById('settings-edit-name')?.value;
-                        const room = document.getElementById('settings-edit-room')?.value;
-                        const email = document.getElementById('settings-edit-email')?.value;
-                        const phone = document.getElementById('settings-edit-phone')?.value;
-                        dispatch(updateUserProfile({ name, room, email, phone }));
-                        dispatch(addToast({ id: `profile-toast-${Date.now()}`, message: 'User profile updated successfully!', type: 'success' }));
-                      }}
+                      onClick={handleSaveProfile}
+                      disabled={isSavingProfile}
                       style={{ fontWeight: 700 }}
                     >
-                      💾 Save Profile Changes
+                      {isSavingProfile ? 'Saving...' : '💾 Save Profile Changes'}
                     </button>
                   </div>
+                </div>
+
+                {/* Password Change Card */}
+                <div style={{
+                  borderRadius:'var(--radius-lg)', background:'var(--bg-card)',
+                  border:'1px solid var(--border-default)', padding: 16,
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>🔒</span>
+                    <span>Security & Password Change</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>
+                    Update your account password with instant salted encryption.
+                  </div>
+
+                  <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: 10 }}>Current Password</label>
+                      <input
+                        type="password"
+                        className="form-input"
+                        style={{ height: 36, fontSize: 12 }}
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="Enter current password"
+                        required
+                      />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: 10 }}>New Password (min 6 chars)</label>
+                        <input
+                          type="password"
+                          className="form-input"
+                          style={{ height: 36, fontSize: 12 }}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="New password"
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: 10 }}>Confirm New Password</label>
+                        <input
+                          type="password"
+                          className="form-input"
+                          style={{ height: 36, fontSize: 12 }}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Confirm new password"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      className="btn btn-secondary btn-sm btn-full"
+                      disabled={isChangingPass}
+                      style={{ fontWeight: 700, marginTop: 4 }}
+                    >
+                      {isChangingPass ? 'Updating...' : '🔑 Update Password'}
+                    </button>
+                  </form>
                 </div>
 
                 <div>

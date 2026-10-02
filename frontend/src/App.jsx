@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   setRole,
+  setActiveTab,
   logout,
   setViewMode,
   setThemeMode,
@@ -56,6 +57,7 @@ export default function App() {
     dbStatus,
     connectionError,
     checkoutModalOpen,
+    settingsModalOpen,
   } = useSelector((s) => s.ticketStore);
 
   const [showSettings, setShowSettings] = useState(false);
@@ -165,8 +167,12 @@ export default function App() {
         {/* Brand */}
         <div
           className="nav-brand"
-          onClick={() => handleRoleSwitch('login')}
-          style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
+          onClick={() => {
+            if (currentRole !== 'login') {
+              dispatch(setActiveTab('register'));
+            }
+          }}
+          style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: currentRole !== 'login' ? 'pointer' : 'default' }}
         >
           <div
             style={{
@@ -545,7 +551,13 @@ export default function App() {
       <RequestAssetModal />
       <QrPreviewModal />
       <QrScannerModal />
-      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      <SettingsModal
+        isOpen={showSettings || settingsModalOpen}
+        onClose={() => {
+          setShowSettings(false);
+          dispatch(setSettingsModalOpen(false));
+        }}
+      />
       <SemesterCheckoutModal isOpen={checkoutModalOpen} onClose={() => dispatch(setCheckoutModalOpen(false))} />
       <ProcurementManagerModal
         isOpen={showProcurement}

@@ -363,13 +363,37 @@ export const registerUserAsync = createAsyncThunk(
   }
 );
 
-// 11. Profile Update
+// 11. Profile & Account Management
 export const updateProfileAsync = createAsyncThunk(
   'assetOps/updateProfileAsync',
   async (profileData, { rejectWithValue }) => {
     try {
       const res = await api.auth.updateProfile(profileData);
       return res.user;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const createUserAsync = createAsyncThunk(
+  'assetOps/createUserAsync',
+  async (userData, { rejectWithValue }) => {
+    try {
+      const created = await api.auth.createUser(userData);
+      return created;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const changePasswordAsync = createAsyncThunk(
+  'assetOps/changePasswordAsync',
+  async (passwordData, { rejectWithValue }) => {
+    try {
+      const res = await api.auth.changePassword(passwordData);
+      return res;
     } catch (err) {
       return rejectWithValue(err.message);
     }
@@ -786,6 +810,11 @@ export const ticketSlice = createSlice({
 
       /* Register User */
       .addCase(registerUserAsync.fulfilled, (state, action) => {
+        state.usersList.push(action.payload);
+      })
+
+      /* Admin Create User */
+      .addCase(createUserAsync.fulfilled, (state, action) => {
         state.usersList.push(action.payload);
       })
 
