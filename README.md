@@ -1,255 +1,288 @@
-# HostelOps: Real-Time Hostel Service & Asset Management
+# Hostel Asset Management System (HAMS)
+### Modern Web Technologies (MWT) Full Stack College Project
 
-An enterprise-grade, full-stack Hostel Asset Management and Lifecycle Management System designed for educational institutions, university residential hostels, and facility operations. Built with a modern **React 19 + Redux Toolkit** frontend and an **Express 5 + MongoDB / Mongoose** backend.
-
----
-
-## 📌 Problem Statement
-
-Hostel residential management requires precise accounting of thousands of physical assets across hundreds of student rooms, common halls, mess facilities, and maintenance stores. Manual ledgers or simple ticketing apps suffer from:
-- Stale inventory records and missing equipment during semester room check-outs.
-- Incorrect transfer history when items move between hostel rooms.
-- Lack of physical verification and QR telemetry.
-- Uncalculated financial depreciation and absence of certified disposal write-offs.
-- Insecure endpoints, privilege escalation risks, and client-side authentication bypasses.
-
-**HostelOps** resolves these operational challenges by providing complete end-to-end lifecycle tracking: procurement register, allocation, room-to-room transfers, return check-in, maintenance tickets, QR code generation/scanning, physical room audits, and certified disposal.
+[![React](https://img.shields.io/badge/Frontend-React%2018%20%7C%20Vite%206-61DAFB?logo=react)](https://react.dev/)
+[![Node.js](https://img.shields.io/badge/Backend-Node.js%20%7C%20Express%204-339933?logo=node.js)](https://nodejs.org/)
+[![MongoDB](https://img.shields.io/badge/Database-MongoDB%20%7C%20Mongoose%208-47A248?logo=mongodb)](https://www.mongodb.com/)
+[![JWT](https://img.shields.io/badge/Auth-JWT%20%2B%20Bcrypt-orange?logo=jsonwebtokens)](https://jwt.io/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
-## 🚀 Key Features
+## 1. Project Overview & Problem Statement
+Hostels across universities and educational institutions manage thousands of physical inventory assets—including beds, study tables, chairs, ceiling fans, electrical appliances, computers, and cupboards. Traditional paper registers or standalone spreadsheets cause severe discrepancies:
+- Untracked damaged, broken, or missing equipment.
+- Inability to hold residents accountable for room-assigned property.
+- Lack of an immutable audit trail when rooms change hands across semesters.
+- Absence of real-time search, multi-condition filtering, and backend pagination.
+- Tedious manual data entry lacking bulk CSV import/export capabilities.
 
-- **End-to-End Asset Lifecycle Tracking:**
-  - **Asset Register:** Procurement logs with original purchase cost, straight-line depreciation rate, supplier details, warranty expiration, and unique asset tags.
-  - **Room Allocation:** Assignment of in-store inventory to specific hostel rooms and student residents with digital audit logs.
-  - **Transfer History (Fixed):** Atomic inter-room/block transfers tracking exact source (`from_location`, `from_student`) and destination (`to_location`, `to_student`).
-  - **Return & Check-in:** Semester vacation returns with condition inspection and optional penalty assessment.
-  - **Maintenance Work Orders:** Reporting of broken equipment, priority level triage, technician assignment, repair cost recording, and resolution tracking.
-  - **Physical Room Audits:** Fast barcode/QR scanning verification against room register to instantly detect discrepancies and flag missing equipment.
-  - **Certified Disposal:** Scrap write-off authorization, salvage value recovery, and digital certificate generation preventing duplicate disposals.
-  - **Student Requisition Portal:** Direct student requests for study equipment or furniture with admin approval workflow.
-- **Enterprise Security & Real Authentication:**
-  - Salted and hashed password storage using `bcryptjs` (passwords never stored or returned in plaintext).
-  - Secure, signed JSON Web Tokens (JWT) with configurable expiration.
-  - Strict Role-Based Access Control (RBAC) middleware (`authenticate`, `requireRole`, `requireAdminType`) protecting all admin operations on the backend.
-  - Student self-registration strictly forced to user role with prevention of privilege escalation.
-  - Centralized API interceptors injecting `Authorization: Bearer <token>` and handling 401 token expirations gracefully.
-  - Persistent session management: `sessionStorage` for temporary sessions, `localStorage` for "Remember Session".
-- **Dynamic Real-Time Analytics:**
-  - MongoDB aggregation of physical counts (assigned, available, under maintenance, missing, disposed).
-  - Live financial metrics: total purchase valuation, current depreciated value, and salvage recovered.
-  - Dynamic category and block distribution graphs.
-- **Physical QR Tag Operations:**
-  - High-resolution printable QR labels for every physical asset tag.
-  - Live QR scanner simulation with real-time asset tag lookup and condition status indicators.
+**Hostel Asset Management System (HAMS)** is a modern, responsive, full-stack web application developed to demonstrate core **Modern Web Technologies (MWT)** concepts. It delivers complete asset lifecycle tracking, role-based access control (Admin/Warden and Student/Resident), JWT authentication, server-side pagination, dynamic search, multi-filter sorting, CSV bulk import/export, and audit history logging.
 
 ---
 
-## 👥 User Roles & Access Matrix
+## 2. Technology Stack & Modern Web Technologies (MWT) Concepts
 
-| Role | Portal / Scope | Key Permissions |
-|---|---|---|
-| **Super Admin** (`admin` / `superadmin`) | Central Operations & Admin Block | Full asset lifecycle, user administration, system settings, global reports, audit logs. |
-| **Asset Admin** (`admin` / `assetadmin`) | Logistics & Stores | Asset register, allocation, transfers, returns, maintenance, physical audits, disposals, requisition review. |
-| **Student Resident** (`user` / `student`) | Student Portal | View room assets, report damaged equipment, submit asset requisitions, view notifications. |
-| **Technician / Staff** (`staff` / `technician`) | Field & Maintenance | View assigned maintenance work orders, update repair status, complete physical audits. |
-
----
-
-## 💻 Technology Stack
-
-- **Frontend:**
-  - React 19
-  - Vite 8
-  - Redux Toolkit & React Redux
-  - Native Vanilla CSS (CSS variables, glassmorphism, responsive themes)
-- **Backend:**
-  - Node.js (ES Modules)
-  - Express 5
-  - MongoDB Atlas & Local MongoDB Fallback
-  - Mongoose 9 (Models, Transactions, Pre-save bcrypt hooks)
-  - `bcryptjs` & `jsonwebtoken` (JWT)
-  - `cors` & `dotenv`
+| Layer | Technologies & Tools | MWT Concepts Demonstrated |
+| :--- | :--- | :--- |
+| **Frontend Framework** | React 18, Vite 6 | Functional Components, Custom Hooks, State & Context Management, Virtual DOM |
+| **Routing & Protection** | React Router DOM v6 | Nested Layouts, Client-Side SPA Routing, Protected Routes (`ProtectedRoute`, `AdminRoute`, `UserRoute`) |
+| **Styling & UI Design** | Vanilla CSS Design System | Responsive Flexbox/Grid, CSS Custom Properties (Tokens), Classic Dashboard Aesthetics, Status Badges, Modals |
+| **Icons & Assets** | Lucide React | Semantic SVG UI Icons, Accessible Micro-interactions |
+| **HTTP Client** | Axios 1.7 | REST API Integration, JWT Request Interceptor, 401 Auto-Redirect Response Interceptor |
+| **Backend Runtime** | Node.js (v18+) | Asynchronous Non-blocking Event Loop, Streams, Native Buffer Operations |
+| **Backend Framework** | Express.js 4.21 | RESTful Route Handlers, Custom Middleware (`authMiddleware`, `adminMiddleware`, `errorMiddleware`), CORS |
+| **File Processing** | Multer & CSV-Parser | Multi-part Form Data Parsing, In-Memory File Streams, CSV Parsing, Row Validation |
+| **Database & ODM** | MongoDB & Mongoose 8 | Schema Validation, BSON Storage, Compound & Single Indexing, Population, Aggregation Pipelines |
+| **Security & Auth** | JSON Web Tokens (JWT) & bcryptjs | One-way Password Hashing (Salt Rounds: 10), Bearer Token Generation & Verification |
 
 ---
 
-## 🏗️ Architecture & Project Structure
+## 3. System Architecture & Authentication Flow
+
+### JWT Authentication Flow
+```text
+1. CLIENT (Browser)             2. EXPRESS BACKEND                3. MONGODB
+       |                                |                             |
+       |--- POST /api/auth/login ------>|                             |
+       |    { email, password }         |--- User.findOne({email}) -->|
+       |                                |<-- User doc with hash ------|
+       |                                |                             |
+       |                                |-- bcrypt.compare(pass, hash)|
+       |                                |-- jwt.sign({ id }, secret)  |
+       |<-- { token, user, success } ---|                             |
+       |                                |                             |
+  Store token in localStorage           |                             |
+       |                                |                             |
+  Subsequent API Request:               |                             |
+       |--- GET /api/assets ----------->|                             |
+       |    Headers: Authorization:     |                             |
+       |    Bearer <token>              |-- jwt.verify(token, secret) |
+       |                                |-- req.user = user           |
+       |                                |-- Check req.user.role       |
+       |                                |--- Query Database --------->|
+       |                                |<-- Return matching data ----|
+       |<-- { success: true, data } ----|                             |
+```
+
+---
+
+## 4. Key Functional Features
+
+### 🏢 Warden / Admin Capabilities
+1. **Interactive Dashboard Metrics:** Real-time KPI counters tracking Total, Available, Assigned, Damaged, Lost, and Under Maintenance assets alongside student numbers and pending requisitions.
+2. **Asset Allocation Distribution:** Visual percentage bar showing live inventory status proportions.
+3. **Server-Side Pagination:** `GET /api/assets?page=1&limit=10` preventing memory overload.
+4. **Multi-Condition Search & Filters:** Search by asset name, code, category, hostel block, room number, or status.
+5. **Backend Sorting:** Sort by Newest First, Oldest First, Name (A-Z), Name (Z-A), Price (Low to High), and Price (High to Low).
+6. **Bulk CSV Import:** Upload `.csv` spreadsheet; backend parses every row, detects duplicate asset codes in DB and CSV, validates required fields, inserts valid records into MongoDB, and generates an error report with row numbers for failed rows.
+7. **Filtered CSV Export:** Export current filtered catalog with a single click as a standard RFC-4180 CSV document.
+8. **Student Requisition Approvals:** Review room equipment requests with automatic conflict prevention (prevents allocating an asset already assigned).
+9. **Damage & Loss Incident Management:** Review student defect reports, change state to 'Under Maintenance', and restore assets upon repair.
+10. **Resident Account Management:** Create, inspect assigned inventory, and remove student accounts.
+11. **Immutable Audit Trail:** Chronological log tracking who created, assigned, modified, or repaired each asset.
+
+### 🎓 Student / Resident Capabilities
+1. **Student Portal Dashboard:** Overview of assigned room assets and ticket status.
+2. **Room Assets View:** Detailed listing of all equipment allocated to the resident's room.
+3. **Asset Requisition:** Submit requisitions with justification for needed room amenities.
+4. **Defect & Loss Reporting:** Report damaged or missing equipment with severity classification (Minor, Moderate, Severe, Total Loss).
+5. **Personal Activity History:** Chronological audit timeline of all personal requests and reported tickets.
+6. **Profile Settings:** Update contact phone number and account credentials.
+
+---
+
+## 5. REST API Documentation
+
+### Authentication Routes (`/api/auth`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/auth/register` | Public | Register new resident account |
+| `POST` | `/api/auth/login` | Public | Authenticate user & return JWT token |
+| `POST` | `/api/auth/logout` | Private | Logout user session |
+| `GET` | `/api/auth/me` | Private | Retrieve current authenticated user profile |
+| `PUT` | `/api/auth/profile` | Private | Update user phone number or password |
+
+### Assets Routes (`/api/assets`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/assets` | Private | Paginated list with search, filter, and sort (`page`, `limit`, `search`, `category`, `status`, `sort`, `order`) |
+| `GET` | `/api/assets/export` | Admin | Bulk CSV export respecting active filter query parameters |
+| `POST` | `/api/assets/import` | Admin | Bulk CSV import via multipart form data (`file`) |
+| `GET` | `/api/assets/stats/overview`| Private | Summary counts, distribution aggregation, and recent feeds |
+| `GET` | `/api/assets/my-assets` | Student | Paginated list of assets assigned to logged-in student |
+| `GET` | `/api/assets/:id` | Private | Single asset details with asset history audit trail |
+| `POST` | `/api/assets` | Admin | Register new asset in inventory store |
+| `PUT` | `/api/assets/:id` | Admin | Update asset specifications |
+| `DELETE`| `/api/assets/:id` | Admin | Permanently delete asset and record audit trail |
+| `PUT` | `/api/assets/:id/assign` | Admin | Assign asset to student resident |
+| `PUT` | `/api/assets/:id/unassign` | Admin | Return asset to Available status |
+
+### User Routes (`/api/users`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/users` | Admin | Paginated list of users (`page`, `limit`, `role`, `search`) |
+| `POST` | `/api/users` | Admin | Create new student or warden account |
+| `GET` | `/api/users/:id` | Admin | User profile with currently assigned inventory assets |
+| `PUT` | `/api/users/:id` | Admin | Update user account details |
+| `DELETE`| `/api/users/:id` | Admin | Remove user and free their assigned assets |
+
+### Requisitions & Incidents (`/api/requests`, `/api/damage`, `/api/history`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/requests` | Admin | Paginated requisition queue (`page`, `limit`, `status`, `search`) |
+| `GET` | `/api/requests/my` | Student | Requisitions submitted by logged-in student |
+| `POST` | `/api/requests` | Student | Submit new asset requisition |
+| `PUT` | `/api/requests/:id` | Admin | Approve or reject requisition with stock allocation |
+| `GET` | `/api/damage` | Admin | Paginated damage/loss incident reports |
+| `GET` | `/api/damage/my` | Student | Damage/loss incident reports by logged-in student |
+| `POST` | `/api/damage` | Private | Report broken or lost asset |
+| `PUT` | `/api/damage/:id` | Admin | Update incident status & synchronize asset condition |
+| `GET` | `/api/history` | Private | Paginated audit trail events (`page`, `limit`, `search`, `action`) |
+
+---
+
+## 6. Project Directory Structure
 
 ```text
 HostelOps/
-├── frontend/
-│   ├── src/
-│   │   ├── components/       # Dashboards, lifecycle modals, QR scanner, login
-│   │   ├── redux/            # ticketSlice.js, assetOpsSlice.js, store.js
-│   │   ├── services/         # Centralized API service with Bearer auth injection
-│   │   ├── utils/            # authStorage.js, translations.js, audioFx.js
-│   │   ├── App.jsx           # Main viewport, role-switcher, connection banner
-│   │   ├── main.jsx          # React DOM entrypoint
-│   │   └── index.css         # Design tokens, theme variables, glassmorphism
-│   ├── public/               # Static assets & icons
-│   ├── package.json
-│   ├── vite.config.js        # Vite dev proxy configuration (/api -> :5000)
-│   └── eslint.config.js      # ESLint configuration
 ├── backend/
-│   ├── db/
-│   │   └── database.js       # MongoDB connection, auto-fallback, idempotent seed
+│   ├── config/
+│   │   └── db.js                 # MongoDB connection logic
+│   ├── controllers/
+│   │   ├── assetController.js    # Asset CRUD, Pagination, Search, CSV Import/Export
+│   │   ├── authController.js     # JWT register, login, logout, profile
+│   │   ├── damageController.js   # Incident reporting & asset synchronization
+│   │   ├── requestController.js  # Requisition workflow & duplicate allocation check
+│   │   └── userController.js     # User management & audit log retrieval
 │   ├── middleware/
-│   │   └── auth.js           # authenticate, requireRole, requireAdminType
+│   │   ├── authMiddleware.js     # JWT verification & RBAC authorization
+│   │   └── errorMiddleware.js    # Centralized 404 & error handler
 │   ├── models/
-│   │   ├── Asset.js          # Asset, Category, Maintenance, Transfer, Audit, Disposal, Request
-│   │   ├── User.js           # User schema with bcrypt pre-save hook & safe JSON export
-│   │   ├── Worker.js         # Maintenance technician records
-│   │   ├── Notification.js   # Standardized notifications with camelCase isRead
-│   │   ├── AuditLog.js       # System audit logs
-│   │   └── index.js          # Centralized Mongoose models export
+│   │   ├── Asset.js              # Asset schema with indexes
+│   │   ├── AssetHistory.js       # Immutable audit log schema
+│   │   ├── AssetRequest.js       # Student requisition schema
+│   │   ├── DamageReport.js       # Damage & loss incident schema
+│   │   └── User.js               # User schema with bcrypt password hashing
 │   ├── routes/
-│   │   ├── auth.js           # Login, registration, profile updates, user management
-│   │   ├── assets.js         # Asset register, allocate, return, transfer, audit, disposal
-│   │   ├── analytics.js      # Dynamic live database aggregations & valuations
-│   │   ├── notifications.js  # Notification endpoints with isRead support
-│   │   ├── audit.js          # Audit logs retrieval
-│   │   └── workers.js        # Staff & worker directory
-│   ├── .env.example          # Clean environment variable template (no credentials)
-│   ├── package.json          # Server dependencies & test script
-│   ├── test_system.js        # 39-step automated integration & security test suite
-│   └── server.js             # Express application entrypoint & health checks
-├── .gitignore
+│   │   ├── assetRoutes.js        # Asset endpoints with multer upload
+│   │   ├── authRoutes.js         # Authentication endpoints
+│   │   ├── damageRoutes.js       # Incident endpoints
+│   │   ├── historyRoutes.js      # Audit log endpoint
+│   │   ├── requestRoutes.js      # Requisition endpoints
+│   │   └── userRoutes.js         # User management endpoints
+│   ├── seed/
+│   │   └── seedData.js           # Database seeder with demo accounts
+│   ├── package.json
+│   └── server.js                 # Express server bootstrap
+│
+├── frontend/
+│   ├── public/
+│   │   └── favicon.svg
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Modal.jsx         # Accessible modal dialog
+│   │   │   ├── Navbar.jsx        # Top header with user pill & logout
+│   │   │   ├── Pagination.jsx    # Reusable server-side pagination component
+│   │   │   ├── ProtectedRoute.jsx# Auth & RBAC route guard
+│   │   │   ├── Sidebar.jsx       # Classic navy navigation sidebar
+│   │   │   ├── StatCard.jsx      # Metrics card with custom accent icons
+│   │   │   └── StatusBadge.jsx   # Pill badge for Available, Assigned, Damaged, Lost
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx   # Global React context for auth state & token storage
+│   │   ├── pages/
+│   │   │   ├── Home.jsx          # Public landing page with 1-click viva demo login
+│   │   │   ├── admin/
+│   │   │   │   ├── AdminDamageReports.jsx # Damage & loss resolution view
+│   │   │   │   ├── AdminDashboard.jsx     # Warden metrics & distribution progress
+│   │   │   │   ├── AdminRequests.jsx      # Requisition approval & allocation
+│   │   │   │   ├── AssetHistoryView.jsx   # System audit trail logs
+│   │   │   │   ├── ManageAssets.jsx       # Asset CRUD, Bulk CSV Import/Export
+│   │   │   │   └── ManageUsers.jsx        # Resident & admin accounts directory
+│   │   │   ├── auth/
+│   │   │   │   ├── Login.jsx              # UNTOUCHED classic login page design
+│   │   │   │   └── Register.jsx           # Student registration page
+│   │   │   └── user/
+│   │   │       ├── MyAssets.jsx           # Student's assigned room assets
+│   │   │       ├── ReportIssue.jsx        # Defect/Loss submission form
+│   │   │       ├── RequestAsset.jsx       # Equipment requisition form
+│   │   │       ├── UserDashboard.jsx      # Student dashboard & quick actions
+│   │   │       ├── UserHistory.jsx        # Personal activity timeline
+│   │   │       └── UserProfile.jsx        # Account contact settings
+│   │   ├── services/
+│   │   │   └── api.js            # Axios client with JWT interceptors & 401 redirect
+│   │   ├── App.jsx               # React Router routes setup
+│   │   ├── index.css             # Design tokens & custom CSS rules
+│   │   └── main.jsx              # Vite entry point
+│   ├── index.html
+│   ├── package.json
+│   └── vite.config.js
 └── README.md
 ```
 
 ---
 
-## ⚙️ Setup & Installation
+## 7. How to Run Locally
 
 ### Prerequisites
-- **Node.js** (v18.0.0 or higher recommended)
-- **npm** (v9.0.0 or higher)
-- **MongoDB** (MongoDB Atlas connection string or local MongoDB running at `mongodb://127.0.0.1:27017`)
+- **Node.js**: v18.0.0 or higher
+- **MongoDB**: Community Server installed locally and running on default port `27017`
 
----
+### Step 1: Start MongoDB
+Ensure MongoDB service is running:
+```powershell
+# Verify MongoDB service status
+Get-Service MongoDB
+```
 
-### 1. Backend Setup
-
-1. Open a terminal and navigate to `backend/`:
-   ```bash
-   cd backend
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Configure environment variables:
-   Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-   Edit `.env` with your settings:
-   ```env
-   PORT=5000
-   NODE_ENV=development
-   MONGODB_URI=mongodb://127.0.0.1:27017/hostelops
-   JWT_SECRET=hostelops_super_secret_jwt_key_2026
-   CORS_ORIGIN=http://localhost:5173
-   SEED_DATABASE=false
-   ```
-   > **Note:** If `MONGODB_URI` points to MongoDB Atlas and network access times out, the backend automatically connects to the local MongoDB fallback at `127.0.0.1:27017`.
-
-4. Start the backend server:
-   ```bash
-   npm run start
-   ```
-   The backend server runs at `http://localhost:5000` with the health endpoint available at `http://localhost:5000/api/health`.
-
----
-
-### 2. Frontend Setup
-
-1. Open a separate terminal and navigate to `frontend/`:
-   ```bash
-   cd frontend
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Start the Vite development server:
-   ```bash
-   npm run dev
-   ```
-   Open `http://localhost:5173` in your browser.
-
----
-
-## 🔑 Predefined Accounts (For College Presentation & Testing)
-
-| Username | Password | Role | Description |
-|---|---|---|---|
-| `superadmin` | `admin@123` | `admin` (Super Admin) | Campus Executive & Directorate |
-| `assetadmin` | `admin@123` | `admin` (Asset Admin) | Central Stores & Logistics Manager |
-| `student1` | `user@123` | `user` (Student) | Resident (Room 204, Block A) |
-| `student2` | `user@123` | `user` (Student) | Resident (Room 102, Block B) |
-| `staff1` | `user@123` | `staff` (Technician) | Maintenance Workshop Staff |
-
-> **Quick Fill:** The login screen provides 1-click quick-fill buttons for demo accounts. All accounts authenticate via genuine bcrypt verification on the server.
-
----
-
-## 📡 API Overview
-
-### Authentication (`/api/auth`)
-- `POST /api/auth/login` — Authenticate user, verify bcrypt hash, return JWT token and safe user profile.
-- `POST /api/auth/register` — Public student self-registration (strictly forces `role: 'user'`).
-- `POST /api/auth/users` — Super Admin creation of administrator accounts.
-- `PATCH /api/auth/profile` — Self-update permitted profile fields (phone, room, block, avatar).
-- `GET /api/auth/users` — Fetch directory of users (Admins & staff).
-
-### Asset Lifecycle (`/api/assets`)
-- `GET /api/assets` — Query asset registry with filters (status, category, block, condition, search).
-- `GET /api/assets/:tag` — Retrieve full lifecycle history and telemetry for a specific tag.
-- `POST /api/assets` — Register new procured asset (`admin` required).
-- `POST /api/assets/allocate` — Allocate asset to room & student (`admin` required).
-- `POST /api/assets/transfer` — Transfer asset with verified pre-mutation audit trail (`admin` required).
-- `POST /api/assets/return` — Check-in return from student back to store (`admin`/`staff` required).
-- `POST /api/assets/maintenance` — Report broken asset and open repair ticket (Students & Admins).
-- `PATCH /api/assets/maintenance/:id` — Update maintenance ticket status and repair costs.
-- `POST /api/assets/audit` — Record physical room verification and flag missing equipment.
-- `POST /api/assets/disposal` — Authorize scrap write-off and record salvage value recovery (`admin` required).
-- `POST /api/assets/requests` — Submit student requisition for new study equipment.
-- `PATCH /api/assets/requests/:id` — Approve or reject student requisition.
-
-### Analytics & System
-- `GET /api/analytics` — Dynamic live metrics, valuation, depreciation, and distributions computed from DB.
-- `GET /api/health` — Backend and MongoDB connection status.
-- `GET /api/notifications` — Notification feed with standardized camelCase `isRead` property.
-
----
-
-## 🧪 Testing & Verification
-
-### Running the Test Suite
-The backend includes an automated 39-step integration and security test suite validating health checks, authentication, privilege escalation blocks, asset state transitions, transfer history integrity, and analytics.
-
-To run the test suite:
-```bash
+### Step 2: Run the Backend
+```powershell
 cd backend
-npm test
+npm install
+node server.js
 ```
+The server will start on port `5000`:
+- REST API URL: `http://localhost:5000/api`
+- Health Check: `http://localhost:5000/api/health`
+- *Note:* If the database is empty, the server automatically populates demo data!
 
-### Production Build Verification
-To verify the frontend builds cleanly without lint or compilation errors:
-```bash
+### Step 3: Run the Frontend
+In a second terminal:
+```powershell
 cd frontend
-npm run lint
-npm run build
+npm install
+npm run dev
 ```
+Open `http://localhost:3000` in your web browser.
 
 ---
 
-## 🔒 Security Notes
-- Database credentials must **never** be committed to source control. Always use environment variables in `.env` files.
-- Real Atlas credentials previously exposed in development repositories must be rotated in the MongoDB Atlas console.
-- Backend routes strictly enforce authorization via JWT payload claims; hidden UI buttons or client modifications cannot bypass server-side role validation.
+## 8. Demo Accounts for College Viva / Demonstration
+
+| Role | Account Name | Email | Password |
+| :--- | :--- | :--- | :--- |
+| **Chief Warden (Admin)** | Dr. Ramesh Kumar | `admin1@hostel.edu` | `password123` |
+| **Assistant Warden (Admin)** | Ms. Sunita Sharma | `admin2@hostel.edu` | `password123` |
+| **Student Resident 1** | Rahul Verma (Room A-101) | `rahul@hostel.edu` | `password123` |
+| **Student Resident 2** | Priya Nair (Room B-204) | `priya@hostel.edu` | `password123` |
+
+*Tip:* Both the **Login Page** and the **Landing Page** include 1-click demo login buttons so you can demonstrate the complete workflow during examination without typing credentials manually.
+
+---
+
+## 9. MWT College Examination Viva Questions & Answers
+
+**Q1: What is JWT and how does it protect routes in this project?**
+> A: JSON Web Token is a compact, URL-safe token containing a signed JSON payload (`{ id: user._id }`). Upon successful login, the server generates the token using `jwt.sign()` and a secret key. The frontend stores it in `localStorage` and includes it in the `Authorization: Bearer <token>` header of every Axios request. Backend middleware (`authMiddleware`) decodes the token with `jwt.verify()`, fetches the user, and validates their role before allowing route execution.
+
+**Q2: How is server-side pagination implemented and why is it preferred over frontend pagination?**
+> A: Server-side pagination uses query parameters `page` and `limit` in Mongoose queries via `.skip((page - 1) * limit).limit(limit)`. This ensures that only the requested slice of documents is retrieved from MongoDB and transmitted over the network. Frontend pagination transfers all records at once, which degrades performance and memory as the database grows to thousands of records.
+
+**Q3: How does the Bulk CSV Import feature work and how are invalid rows handled?**
+> A: The admin uploads a `.csv` file via multipart form data (`multer.memoryStorage()`). The backend converts the file buffer into a readable stream and pipes it into `csv-parser`. Each row is sanitized and checked for mandatory fields (`assetName`, `assetCode`, `category`). The system verifies that the asset code is unique in the CSV and does not already exist in MongoDB. Valid records are inserted in bulk via `Asset.insertMany()`, while failed rows are collected into an array with row numbers and exact rejection reasons displayed in the UI.
+
+**Q4: How does the Requisition Approval prevent assigning the same asset twice?**
+> A: In `requestController.js`, when a warden approves a requisition, the controller queries the asset and verifies `if (asset.status !== 'Available')`. If another warden or user already claimed that asset, the transaction is rejected with an HTTP 400 error message, preventing race conditions and duplicate allocations.
+
+**Q5: How does the application maintain state across page reloads?**
+> A: Through `AuthContext.jsx`. On initial load, a `useEffect` hook reads `hams_token` and `hams_user` from browser `localStorage`. If present, it populates React state so the user remains authenticated without logging in repeatedly. If an API request returns HTTP 401 (token expired), the Axios response interceptor clears `localStorage` and redirects the user to `/login`.

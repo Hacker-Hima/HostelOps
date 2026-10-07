@@ -1,73 +1,77 @@
-import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema(
   {
-    id: { type: String, required: true, unique: true, index: true },
-    username: { type: String, required: true, unique: true, index: true, lowercase: true, trim: true },
-    name: { type: String, required: true, trim: true },
-    initials: { type: String, required: true },
-    room: { type: String, default: 'Admin Suite', trim: true },
-    block: { type: String, default: 'Admin Block', trim: true },
-    floor: { type: String, default: 'Floor 1', trim: true },
-    roll_number: { type: String, required: true, trim: true, index: true },
-    email: { type: String, required: true, trim: true, lowercase: true, index: true },
-    phone: { type: String, required: true, trim: true },
+    name: {
+      type: String,
+      required: [true, 'Please provide user name'],
+      trim: true,
+    },
+    email: {
+      type: String,
+      required: [true, 'Please provide an email'],
+      unique: true,
+      lowercase: true,
+      trim: true,
+      match: [
+        /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
+        'Please provide a valid email address',
+      ],
+    },
+    password: {
+      type: String,
+      required: [true, 'Please provide a password'],
+      minlength: [6, 'Password must be at least 6 characters long'],
+      select: false,
+    },
     role: {
       type: String,
-      required: true,
-      enum: ['admin', 'user', 'student', 'staff', 'technician'],
-      default: 'user',
-      index: true,
+      enum: ['admin', 'student', 'user', 'technician', 'staff'],
+      default: 'student',
     },
-    admin_type: {
+    hostelBlock: {
       type: String,
-      enum: ['superadmin', 'assetadmin', ''],
-      default: '',
+      default: 'Block A',
+      trim: true,
     },
-    avatar_color: { type: String, default: '#7c3aed' },
-    password: { type: String, required: true, select: false },
-    isActive: { type: Boolean, default: true },
+    roomNumber: {
+      type: String,
+      default: '101',
+      trim: true,
+    },
+    phone: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    studentId: {
+      type: String,
+      default: '',
+      trim: true,
+    },
   },
   {
     timestamps: true,
-    toJSON: {
-      transform(doc, ret) {
-        delete ret.password;
-        delete ret.__v;
-        return ret;
-      },
-    },
-    toObject: {
-      transform(doc, ret) {
-        delete ret.password;
-        delete ret.__v;
-        return ret;
-      },
-    },
   }
 );
 
-// Pre-save hook: Hash password if modified (Mongoose 8+ async style)
-userSchema.pre('save', async function () {
-  if (!this.isModified('password')) return;
+// Optimize search by role
+userSchema.index({ role: 1 });
+
+// Hash password before saving
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) {
+    return next();
+  }
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  next();
 });
 
 // Compare password method
-userSchema.methods.comparePassword = async function (candidatePassword) {
-  if (!this.password) return false;
-  return bcrypt.compare(candidatePassword, this.password);
+userSchema.methods.matchPassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Safe representation method
-userSchema.methods.toSafeObject = function () {
-  const obj = this.toObject();
-  delete obj.password;
-  delete obj.__v;
-  return obj;
-};
-
-export const User = mongoose.models.User || mongoose.model('User', userSchema);
-export default User;
+module.exports = mongoose.models.User || mongoose.model('User', userSchema);
