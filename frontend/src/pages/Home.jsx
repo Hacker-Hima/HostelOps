@@ -7,15 +7,7 @@ import {
   ShieldCheck,
   UserCheck,
   ArrowRight,
-  Sun,
-  Moon,
   Globe,
-  Palette,
-  Gamepad2,
-  RotateCcw,
-  Trophy,
-  CheckCircle2,
-  Sparkles,
 } from 'lucide-react';
 
 // Multi-language translation dictionary
@@ -178,117 +170,13 @@ const translations = {
   },
 };
 
-// Initial mini-game tiles (6 pairs = 12 cards)
-const assetItems = [
-  { id: 1, type: 'bed', name: 'Bed', icon: '🛏️' },
-  { id: 2, type: 'chair', name: 'Chair', icon: '🪑' },
-  { id: 3, type: 'table', name: 'Table', icon: '🪵' },
-  { id: 4, type: 'fan', name: 'Fan', icon: '🌀' },
-  { id: 5, type: 'pc', name: 'Computer', icon: '💻' },
-  { id: 6, type: 'cupboard', name: 'Cupboard', icon: '🗄️' },
-];
-
-const shuffleCards = () => {
-  const deck = [...assetItems, ...assetItems].map((item, index) => ({
-    ...item,
-    cardId: `${item.type}-${index}-${Math.random()}`,
-    isFlipped: false,
-    isMatched: false,
-  }));
-  return deck.sort(() => Math.random() - 0.5);
-};
-
-const colorThemes = [
-  { name: 'Blue', hex: '#2563eb', hover: '#1d4ed8' },
-  { name: 'Emerald', hex: '#059669', hover: '#047857' },
-  { name: 'Purple', hex: '#7c3aed', hover: '#6d28d9' },
-  { name: 'Amber', hex: '#ea580c', hover: '#c2410c' },
-  { name: 'Rose', hex: '#e11d48', hover: '#be123c' },
-];
-
 const Home = () => {
   const { isAuthenticated, isAdmin } = useAuth();
-  const {
-    language: lang,
-    setLanguage,
-    themeMode,
-    setThemeMode,
-    themeColor: currentColor,
-    setThemeColor,
-  } = useLanguage();
+  const { language: lang, setLanguage } = useLanguage();
   const navigate = useNavigate();
-
-  // Mini-Game State
-  const [cards, setCards] = useState(shuffleCards);
-  const [flippedCards, setFlippedCards] = useState([]);
-  const [moves, setMoves] = useState(0);
-  const [score, setScore] = useState(0);
-  const [isWon, setIsWon] = useState(false);
-
-  const handleToggleTheme = (mode) => {
-    setThemeMode(mode);
-  };
-
-  const handleSelectColor = (hex) => {
-    setThemeColor(hex);
-  };
 
   const handleSelectLang = (newLang) => {
     setLanguage(newLang);
-  };
-
-  // Mini Game Card Flip Handler
-  const handleCardClick = (card) => {
-    if (card.isFlipped || card.isMatched || flippedCards.length === 2) return;
-
-    const newCards = cards.map((c) =>
-      c.cardId === card.cardId ? { ...c, isFlipped: true } : c
-    );
-    setCards(newCards);
-
-    const newFlipped = [...flippedCards, card];
-    setFlippedCards(newFlipped);
-
-    if (newFlipped.length === 2) {
-      setMoves((prev) => prev + 1);
-      const [first, second] = newFlipped;
-
-      if (first.type === second.type) {
-        // Matched
-        setTimeout(() => {
-          setCards((prev) => {
-            const updated = prev.map((c) =>
-              c.type === first.type ? { ...c, isMatched: true, isFlipped: true } : c
-            );
-            const allMatched = updated.every((c) => c.isMatched);
-            if (allMatched) setIsWon(true);
-            return updated;
-          });
-          setScore((prev) => prev + 15);
-          setFlippedCards([]);
-        }, 300);
-      } else {
-        // Mismatched
-        setTimeout(() => {
-          setCards((prev) =>
-            prev.map((c) =>
-              c.cardId === first.cardId || c.cardId === second.cardId
-                ? { ...c, isFlipped: false }
-                : c
-            )
-          );
-          setFlippedCards([]);
-        }, 700);
-      }
-    }
-  };
-
-  const handleRestartGame = () => {
-    setCards(shuffleCards());
-    setFlippedCards([]);
-    setMoves(0);
-    setScore(0);
-    setIsWon(false);
   };
 
   const t = translations[lang] || translations.en;
@@ -445,8 +333,8 @@ const Home = () => {
         </div>
 
         {/* ========================================================
-            NEW PORTAL DASHBOARD SECTION
-            Includes: Direct Sign In Access, Setting Bar, & Mini-Game
+            PORTAL DASHBOARD SECTION
+            Includes: Direct Sign In Access & Mini-Game
            ======================================================== */}
         <div
           style={{
@@ -455,118 +343,7 @@ const Home = () => {
             textAlign: 'left',
           }}
         >
-          {/* 1. Setting Bar: Light/Dark Mode, Theme Colors, Languages */}
-          <div
-            className="card"
-            style={{
-              marginBottom: '1.5rem',
-              padding: '1.25rem 1.5rem',
-              backgroundColor: 'var(--bg-card)',
-              borderColor: 'var(--border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '1.25rem',
-              boxShadow: 'var(--shadow-md)',
-            }}
-          >
-            {/* Setting Bar Header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <Palette size={20} color="var(--primary)" />
-              <div>
-                <strong style={{ fontSize: '0.95rem', color: 'var(--text-main)', display: 'block' }}>
-                  {t.settingsBarTitle}
-                </strong>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  Personalize your theme, lighting, and language preferences
-                </span>
-              </div>
-            </div>
-
-            {/* Controls: Mode, Color Picker, Language */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
-              {/* Light / Dark Mode Toggle */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                  {t.themeMode}:
-                </span>
-                <div style={{ display: 'inline-flex', background: 'var(--bg-main)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                  <button
-                    onClick={() => handleToggleTheme('light')}
-                    className={`btn btn-sm ${themeMode === 'light' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
-                  >
-                    <Sun size={13} />
-                    <span>{t.light}</span>
-                  </button>
-                  <button
-                    onClick={() => handleToggleTheme('dark')}
-                    className={`btn btn-sm ${themeMode === 'dark' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
-                  >
-                    <Moon size={13} />
-                    <span>{t.dark}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Theme Color Mode Palette */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                  {t.accentColor}:
-                </span>
-                <div style={{ display: 'flex', gap: '0.35rem' }}>
-                  {colorThemes.map((c) => (
-                    <button
-                      key={c.hex}
-                      onClick={() => handleSelectColor(c.hex)}
-                      title={c.name}
-                      style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        backgroundColor: c.hex,
-                        border: currentColor === c.hex ? '3px solid var(--text-main)' : '2px solid #ffffff',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                        cursor: 'pointer',
-                        transform: currentColor === c.hex ? 'scale(1.15)' : 'scale(1)',
-                        transition: 'transform 0.2s',
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Language Selector */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                  {t.language}:
-                </span>
-                <select
-                  value={lang}
-                  onChange={(e) => handleSelectLang(e.target.value)}
-                  className="form-control"
-                  style={{
-                    padding: '0.25rem 0.5rem',
-                    fontSize: '0.8rem',
-                    backgroundColor: 'var(--bg-card)',
-                    color: 'var(--text-main)',
-                    borderColor: 'var(--border)',
-                    height: 'auto',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <option value="en">English</option>
-                  <option value="ta">தமிழ் (Tamil)</option>
-                  <option value="ml">മലയാളം (Malayalam)</option>
-                  <option value="hi">हिन्दी (Hindi)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* 2. Portal Quick Action Cards (Direct entry to Sign In & Register) */}
+          {/* 1. Portal Quick Action Cards (Direct entry to Sign In & Register) */}
           <div
             style={{
               display: 'grid',
@@ -645,171 +422,6 @@ const Home = () => {
                 <span>{t.registerBtn}</span>
                 <ArrowRight size={16} />
               </Link>
-            </div>
-          </div>
-
-          {/* 3. Small Game in Dashboard: Hostel Asset Memory Matcher */}
-          <div
-            className="card"
-            style={{
-              padding: '1.5rem',
-              backgroundColor: 'var(--bg-card)',
-              borderColor: 'var(--border)',
-              boxShadow: 'var(--shadow-md)',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '1rem',
-                marginBottom: '1rem',
-                borderBottom: '1px solid var(--border)',
-                paddingBottom: '0.75rem',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <Gamepad2 size={22} color="var(--primary)" />
-                <div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                    {t.gameTitle}
-                  </h3>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    {t.gameSubtitle}
-                  </span>
-                </div>
-              </div>
-
-              {/* Game Stats & Reset Button */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <span
-                  style={{
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    background: 'var(--primary-light)',
-                    color: 'var(--primary)',
-                    padding: '0.25rem 0.6rem',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border)',
-                  }}
-                >
-                  {t.score}: {score}
-                </span>
-
-                <span
-                  style={{
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    background: 'var(--bg-main)',
-                    color: 'var(--text-muted)',
-                    padding: '0.25rem 0.6rem',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border)',
-                  }}
-                >
-                  {t.moves}: {moves}
-                </span>
-
-                <button
-                  onClick={handleRestartGame}
-                  className="btn btn-secondary btn-sm"
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem' }}
-                  title="Restart Mini-Game"
-                >
-                  <RotateCcw size={13} />
-                  <span>{t.resetGame}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Win Celebration Banner */}
-            {isWon && (
-              <div
-                style={{
-                  background: '#ecfdf5',
-                  border: '1px solid #a7f3d0',
-                  color: '#065f46',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '8px',
-                  marginBottom: '1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  fontWeight: 600,
-                  fontSize: '0.9rem',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Trophy size={18} color="#059669" />
-                  <span>{t.gameWon} (Total Moves: {moves})</span>
-                </div>
-                <button
-                  onClick={handleRestartGame}
-                  className="btn btn-primary btn-sm"
-                  style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem' }}
-                >
-                  {t.playAgain}
-                </button>
-              </div>
-            )}
-
-            {/* Memory Card Grid (12 Cards: 6 Pairs) */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(6, 1fr)',
-                gap: '0.6rem',
-                justifyContent: 'center',
-              }}
-            >
-              {cards.map((card) => {
-                const showFace = card.isFlipped || card.isMatched;
-                return (
-                  <button
-                    key={card.cardId}
-                    onClick={() => handleCardClick(card)}
-                    disabled={card.isMatched}
-                    style={{
-                      height: '84px',
-                      borderRadius: '10px',
-                      border: card.isMatched
-                        ? '2px solid #10b981'
-                        : showFace
-                        ? '2px solid var(--primary)'
-                        : '1px solid var(--border)',
-                      backgroundColor: card.isMatched
-                        ? '#f0fdf4'
-                        : showFace
-                        ? 'var(--bg-card)'
-                        : 'var(--bg-main)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.2rem',
-                      cursor: card.isMatched ? 'default' : 'pointer',
-                      transform: showFace ? 'scale(1.02)' : 'scale(1)',
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                      boxShadow: showFace ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none',
-                    }}
-                  >
-                    {showFace ? (
-                      <>
-                        <span style={{ fontSize: '1.6rem', lineHeight: 1 }}>{card.icon}</span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: card.isMatched ? '#059669' : 'var(--text-main)' }}>
-                          {card.name}
-                        </span>
-                      </>
-                    ) : (
-                      <span style={{ fontSize: '1.2rem', color: 'var(--text-muted)', opacity: 0.6 }}>
-                        ❓
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
             </div>
           </div>
         </div>

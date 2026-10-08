@@ -63,18 +63,27 @@ const Navbar = () => {
         <Link
           to="/"
           className="btn btn-secondary btn-sm"
-          title={t('backToHome')}
+          title="Back to Home"
           style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
         >
           <HomeIcon size={16} />
-          <span>{t('homeAndGame')}</span>
+          <span>BACK TO HOME</span>
         </Link>
 
         {user && (
           <>
             <div className="user-pill">
-              <div className="user-avatar">
-                {user.role === 'admin' ? (
+              <div className="user-avatar" style={{ overflow: 'hidden' }}>
+                {user.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt={user.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                ) : user.role === 'admin' ? (
                   <ShieldCheck size={18} />
                 ) : (
                   <User size={18} />

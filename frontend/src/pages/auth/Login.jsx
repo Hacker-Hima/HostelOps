@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { Building2, Lock, Mail, AlertCircle, ArrowRight, ArrowLeft, ShieldCheck, UserCheck, Home, Gamepad2, Globe, Wrench } from 'lucide-react';
+import { Building2, Lock, Mail, AlertCircle, ArrowRight, ArrowLeft, Home, Globe } from 'lucide-react';
+import GoogleAuthButton from '../../components/GoogleAuthButton';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -33,12 +34,6 @@ const Login = () => {
     } else {
       setError(res.message);
     }
-  };
-
-  const fillCredentials = (demoEmail, demoPass) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setError('');
   };
 
   return (
@@ -76,7 +71,7 @@ const Login = () => {
           id="btn-login-top-back-home"
         >
           <Home size={15} />
-          <span>{t('homeAndGame')}</span>
+          <span>BACK TO HOME</span>
         </Link>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#ffffff', padding: '0.2rem 0.5rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
@@ -217,6 +212,18 @@ const Login = () => {
             <ArrowRight size={18} />
           </button>
 
+          {/* Divider */}
+          <div style={{ display: 'flex', alignItems: 'center', margin: '1.25rem 0 1rem 0' }}>
+            <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
+            <span style={{ padding: '0 0.75rem', fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              or continue with
+            </span>
+            <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
+          </div>
+
+          {/* Continue with Google OAuth Button */}
+          <GoogleAuthButton onError={(msg) => setError(msg)} />
+
           <Link
             to="/"
             className="btn btn-secondary"
@@ -232,67 +239,12 @@ const Login = () => {
               textDecoration: 'none',
               fontWeight: 600,
             }}
-            id="btn-login-direct-home-game"
+            id="btn-login-direct-home"
           >
-            <Gamepad2 size={16} />
-            <span>{t('homeAndGame')}</span>
+            <Home size={16} />
+            <span>BACK TO HOME</span>
           </Link>
         </form>
-
-        {/* Quick fill buttons for Viva / Testing */}
-        <div style={{ marginTop: '1.75rem', paddingTop: '1.25rem', borderTop: '1px solid #e2e8f0' }}>
-          <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.5px' }}>
-            {t('quickDemo')}
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => fillCredentials('admin1@hostel.edu', 'password123')}
-              id="demo-admin1"
-            >
-              <ShieldCheck size={14} color="#2563eb" />
-              <span>Admin 1 (Chief)</span>
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => fillCredentials('admin2@hostel.edu', 'password123')}
-              id="demo-admin2"
-            >
-              <ShieldCheck size={14} color="#2563eb" />
-              <span>Admin 2 (Warden)</span>
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => fillCredentials('rahul@hostel.edu', 'password123')}
-              id="demo-student1"
-            >
-              <UserCheck size={14} color="#059669" />
-              <span>Student (Rahul)</span>
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => fillCredentials('priya@hostel.edu', 'password123')}
-              id="demo-student2"
-            >
-              <UserCheck size={14} color="#059669" />
-              <span>Student (Priya)</span>
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              style={{ gridColumn: 'span 2', background: '#f8fafc', borderColor: '#cbd5e1' }}
-              onClick={() => fillCredentials('tech@hostel.edu', 'password123')}
-              id="demo-technician"
-            >
-              <Wrench size={14} color="#d97706" />
-              <span>Technician / Staff (Selvam Kumar)</span>
-            </button>
-          </div>
-        </div>
 
         <div style={{ textAlign: 'center', marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
           <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
@@ -316,7 +268,7 @@ const Login = () => {
             }}
           >
             <ArrowLeft size={16} />
-            <span>{t('backToHome')}</span>
+            <span>BACK TO HOME</span>
           </Link>
         </div>
       </div>

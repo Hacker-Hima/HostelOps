@@ -62,6 +62,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const googleLogin = async (credential, userInfo) => {
+    try {
+      const { data } = await api.post('/auth/google', { credential, userInfo });
+      if (data.success) {
+        setToken(data.token);
+        setUser(data.user);
+        localStorage.setItem('hams_token', data.token);
+        localStorage.setItem('hams_user', JSON.stringify(data.user));
+        return { success: true, user: data.user };
+      }
+      return { success: false, message: data.message || 'Google sign-in failed' };
+    } catch (error) {
+      const message =
+        error.response?.data?.message || error.message || 'Network error during Google sign-in';
+      return { success: false, message };
+    }
+  };
+
   const logout = () => {
     setUser(null);
     setToken(null);
@@ -82,6 +100,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         login,
         register,
+        googleLogin,
         logout,
         updateUser,
         isAuthenticated: !!user && !!token,

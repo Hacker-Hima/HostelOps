@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Building2, AlertCircle, ArrowRight } from 'lucide-react';
+import GoogleAuthButton from '../../components/GoogleAuthButton';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -89,6 +90,18 @@ const Register = () => {
             <span>{error}</span>
           </div>
         )}
+
+        {/* Continue with Google OAuth Button */}
+        <GoogleAuthButton text="Sign up with Google" onError={(msg) => setError(msg)} />
+
+        {/* Divider */}
+        <div style={{ display: 'flex', alignItems: 'center', margin: '1.25rem 0 1rem 0' }}>
+          <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
+          <span style={{ padding: '0 0.75rem', fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            or register manually
+          </span>
+          <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
+        </div>
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">

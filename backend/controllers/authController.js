@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'hostel_asset_management_jwt_secret_mwt_2026';
@@ -199,10 +200,137 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
+// @desc    Authenticate or register user with Google OAuth ID token
+// @route   POST /api/auth/google
+// @access  Public
+const googleAuth = async (req, res, next) => {
+  try {
+    const { credential, userInfo } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({
+        success: false,
+        message: 'Google credential token is required',
+      });
+    }
+
+    let payload = null;
+    const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+
+    // Handle Mock/Demo Google credentials (useful for testing or before configuring Google Cloud console)
+    if (typeof credential === 'string' && credential.startsWith('mock-google-token:')) {
+      const demoEmail = credential.split(':')[1] || 'google.student@hostel.edu';
+      const demoName = userInfo?.name || (demoEmail.split('@')[0].charAt(0).toUpperCase() + demoEmail.split('@')[0].slice(1));
+      payload = {
+        email: demoEmail,
+        name: demoName,
+        sub: 'mock_gid_' + Math.abs(demoEmail.split('').reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0)),
+        picture: userInfo?.picture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+      };
+    } else {
+      // Official Google ID Token verification
+      try {
+        if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_ID !== 'your_google_client_id_here.apps.googleusercontent.com') {
+          const client = new OAuth2Client(GOOGLE_CLIENT_ID);
+          const ticket = await client.verifyIdToken({
+            idToken: credential,
+            audience: GOOGLE_CLIENT_ID,
+          });
+          payload = ticket.getPayload();
+        } else {
+          // If backend GOOGLE_CLIENT_ID is not configured in .env, verify against Google's public tokeninfo
+          const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+          if (!response.ok) {
+            const errBody = await response.json().catch(() => ({}));
+            throw new Error(errBody.error_description || 'Token verification failed with Google');
+          }
+          payload = await response.json();
+        }
+      } catch (verifyError) {
+        return res.status(401).json({
+          success: false,
+          message: 'Google token verification failed: ' + (verifyError.message || 'Invalid token'),
+        });
+      }
+    }
+
+    if (!payload || !payload.email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Could not extract valid profile information from Google account',
+      });
+    }
+
+    const cleanEmail = payload.email.toLowerCase().trim();
+    const googleId = payload.sub;
+    const avatar = payload.picture || '';
+    const name = payload.name || cleanEmail.split('@')[0];
+
+    // Find existing user by email
+    let user = await User.findOne({ email: cleanEmail });
+
+    if (user) {
+      let changed = false;
+      if (!user.googleId) {
+        user.googleId = googleId;
+        changed = true;
+      }
+      if (!user.avatar && avatar) {
+        user.avatar = avatar;
+        changed = true;
+      }
+      if (user.authProvider !== 'google' && !user.authProvider) {
+        user.authProvider = 'google';
+        changed = true;
+      }
+      if (changed) {
+        await user.save();
+      }
+    } else {
+      // Auto-register new student resident
+      user = await User.create({
+        name,
+        email: cleanEmail,
+        googleId,
+        avatar,
+        authProvider: 'google',
+        role: 'student',
+        hostelBlock: 'Block A',
+        roomNumber: '101',
+        phone: '',
+        studentId: 'STU-' + Math.floor(1000 + Math.random() * 9000),
+      });
+    }
+
+    const token = generateToken(user._id);
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        hostelBlock: user.hostelBlock,
+        roomNumber: user.roomNumber,
+        phone: user.phone || '',
+        studentId: user.studentId || '',
+        avatar: user.avatar || '',
+        authProvider: user.authProvider || 'google',
+      },
+      message: 'Google authentication successful',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
   getMe,
   logout,
   updateProfile,
+  googleAuth,
 };

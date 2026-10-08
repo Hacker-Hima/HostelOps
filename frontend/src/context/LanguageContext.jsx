@@ -8,7 +8,7 @@ export const translations = {
     brand: 'HAMS',
     systemName: 'Hostel Asset Management System',
     backToHome: 'Back to Home / Portal',
-    homeAndGame: 'Back to Home & Game',
+    homeAndGame: 'BACK TO HOME',
     
     // Auth
     signIn: 'Account Sign In',
@@ -120,7 +120,7 @@ export const translations = {
     brand: 'HAMS',
     systemName: 'விடுதி சொத்து மேலாண்மை அமைப்பு',
     backToHome: 'முகப்புப் பக்கத்திற்குத் திரும்பு',
-    homeAndGame: 'முகப்பு மற்றும் மினி-கேம்',
+    homeAndGame: 'முகப்புப் பக்கம் (BACK TO HOME)',
     
     // Auth
     signIn: 'கணக்கில் உள்நுழைக',
@@ -232,7 +232,7 @@ export const translations = {
     brand: 'HAMS',
     systemName: 'ഹോസ്റ്റൽ അസറ്റ് മാനേജ്‌മെന്റ് സിസ്റ്റം',
     backToHome: 'ഹോം പേജിലേക്ക് മടങ്ങുക',
-    homeAndGame: 'ഹോം & മിനി-ഗെയിം',
+    homeAndGame: 'ഹോം പേജ് (BACK TO HOME)',
     
     // Auth
     signIn: 'സിസ്റ്റത്തിലേക്ക് സൈൻ ഇൻ ചെയ്യുക',
@@ -344,7 +344,7 @@ export const translations = {
     brand: 'HAMS',
     systemName: 'छात्रावास संपत्ति प्रबंधन प्रणाली',
     backToHome: 'मुख्य पृष्ठ पर वापस जाएं',
-    homeAndGame: 'होम एवं मिनी-गेम',
+    homeAndGame: 'मुख्य पृष्ठ (BACK TO HOME)',
     
     // Auth
     signIn: 'खाता साइन इन करें',
