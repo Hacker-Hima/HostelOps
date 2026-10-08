@@ -21,12 +21,24 @@ const Register = () => {
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    if (name === 'phone') {
+      const digitsOnly = value.replace(/\D/g, '').slice(0, 10);
+      setFormData({ ...formData, phone: digitsOnly });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (formData.phone && formData.phone.length !== 10) {
+      setError('Contact phone must be a valid 10-digit number');
+      return;
+    }
+
     setLoading(true);
 
     const res = await register(formData);
@@ -201,8 +213,11 @@ const Register = () => {
                 id="reg-phone"
                 name="phone"
                 type="tel"
+                inputMode="numeric"
+                pattern="[0-9]{10}"
+                maxLength={10}
                 className="form-control"
-                placeholder="+91 98765 00000"
+                placeholder="9876543210"
                 value={formData.phone}
                 onChange={handleChange}
               />

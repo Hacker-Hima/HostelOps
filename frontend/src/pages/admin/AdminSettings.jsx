@@ -302,10 +302,19 @@ const AdminSettings = () => {
               <div className="form-group">
                 <label className="form-label">Emergency Contact Phone</label>
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]{10}"
+                  maxLength={10}
                   className="form-control"
+                  placeholder="9876543210"
                   value={generalSettings.contactPhone}
-                  onChange={(e) => setGeneralSettings({ ...generalSettings, contactPhone: e.target.value })}
+                  onChange={(e) =>
+                    setGeneralSettings({
+                      ...generalSettings,
+                      contactPhone: e.target.value.replace(/\D/g, '').slice(0, 10),
+                    })
+                  }
                 />
               </div>
 

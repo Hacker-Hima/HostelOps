@@ -1,8 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
-import { X, UserPlus, ArrowLeft, Loader2 } from 'lucide-react';
+import { X, UserPlus, ArrowLeft, Loader2, Trash2 } from 'lucide-react';
+import {
+  getSavedOAuthAccounts,
+  saveOAuthAccount,
+  removeOAuthAccount,
+  getCurrentUserEmail,
+} from '../utils/authStorage';
 
 const GoogleAuthButton = ({
   text = 'Continue with Google',
@@ -12,6 +18,7 @@ const GoogleAuthButton = ({
 }) => {
   const { googleLogin } = useAuth();
   const navigate = useNavigate();
+  const [accounts, setAccounts] = useState([]);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [signingInAccount, setSigningInAccount] = useState(null);
   const [view, setView] = useState('list'); // 'list' | 'custom'
@@ -35,6 +42,15 @@ const GoogleAuthButton = ({
     }
   };
 
+  const reloadAccounts = () => {
+    const list = getSavedOAuthAccounts();
+    setAccounts(list);
+  };
+
+  useEffect(() => {
+    reloadAccounts();
+  }, [showAccountModal]);
+
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
       setSigningInAccount('google');
@@ -42,6 +58,8 @@ const GoogleAuthButton = ({
       setSigningInAccount(null);
 
       if (res.success) {
+        saveOAuthAccount(res.user);
+        reloadAccounts();
         handleAuthSuccess(res.user);
       } else {
         onError(res.message || 'Google sign-in failed');
@@ -63,6 +81,8 @@ const GoogleAuthButton = ({
       });
 
       if (res.success) {
+        saveOAuthAccount(res.user || account);
+        reloadAccounts();
         setShowAccountModal(false);
         handleAuthSuccess(res.user);
       } else {
@@ -81,43 +101,23 @@ const GoogleAuthButton = ({
       setCustomError('Enter a valid email address');
       return;
     }
-    const name = customName.trim() || customEmail.split('@')[0];
+    const email = customEmail.trim().toLowerCase();
+    const name = customName.trim() || email.split('@')[0];
     const initial = name.charAt(0).toUpperCase();
     selectAccount({
       name,
-      email: customEmail.trim().toLowerCase(),
+      email,
       avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a73e8&color=fff`,
       color: '#1a73e8',
       initial,
     });
   };
 
-  const googleAccounts = [
-    {
-      name: 'Arun Kumar',
-      email: 'arunkumar.student@gmail.com',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop',
-      color: '#1a73e8',
-      initial: 'A',
-      role: 'Hostel Resident',
-    },
-    {
-      name: 'Priya Sharma',
-      email: 'priyasharma.hostel@gmail.com',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop',
-      color: '#e37400',
-      initial: 'P',
-      role: 'Hostel Resident',
-    },
-    {
-      name: 'Admin Warden',
-      email: 'admin1@hostel.edu',
-      avatar: '',
-      color: '#d93025',
-      initial: 'W',
-      role: 'Chief Warden',
-    },
-  ];
+  const handleRemoveAccount = (e, emailToRemove) => {
+    e.stopPropagation();
+    const updated = removeOAuthAccount(emailToRemove);
+    setAccounts(updated || []);
+  };
 
   return (
     <div style={{ width: '100%', margin: '0.6rem 0', ...style }} className={className}>
@@ -360,9 +360,19 @@ const GoogleAuthButton = ({
 
             {/* Account List View */}
             {view === 'list' && (
-              <div style={{ borderTop: '1px solid #dadce0', borderBottom: '1px solid #dadce0' }}>
-                {googleAccounts.map((acc) => {
+              <div
+                style={{
+                  borderTop: '1px solid #dadce0',
+                  borderBottom: '1px solid #dadce0',
+                  maxHeight: '340px',
+                  overflowY: 'auto',
+                }}
+              >
+                {accounts.map((acc) => {
                   const isSigningInThis = signingInAccount === acc.email;
+                  const currentEmail = getCurrentUserEmail();
+                  const isCurrent = currentEmail && currentEmail === acc.email.toLowerCase();
+
                   return (
                     <div
                       key={acc.email}
@@ -389,7 +399,7 @@ const GoogleAuthButton = ({
                           width: '40px',
                           height: '40px',
                           borderRadius: '50%',
-                          backgroundColor: acc.color,
+                          backgroundColor: acc.color || '#1a73e8',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -405,9 +415,12 @@ const GoogleAuthButton = ({
                             src={acc.avatar}
                             alt={acc.name}
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
                           />
                         ) : (
-                          acc.initial
+                          acc.initial || acc.name?.charAt(0)?.toUpperCase() || 'U'
                         )}
                       </div>
 
@@ -437,6 +450,67 @@ const GoogleAuthButton = ({
                           {acc.email}
                         </div>
                       </div>
+
+                      {/* Current active user tag or role */}
+                      {isCurrent ? (
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            backgroundColor: '#e6f4ea',
+                            color: '#137333',
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '12px',
+                            fontWeight: 500,
+                            flexShrink: 0,
+                          }}
+                        >
+                          Signed in
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            color: '#5f6368',
+                            backgroundColor: '#f1f3f4',
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '12px',
+                            fontWeight: 400,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {acc.role || 'Signed out'}
+                        </span>
+                      )}
+
+                      {/* Remove account button */}
+                      <button
+                        type="button"
+                        title="Remove from account list"
+                        onClick={(e) => handleRemoveAccount(e, acc.email)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#9aa0a6',
+                          padding: '0.3rem',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.15s ease',
+                          flexShrink: 0,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = '#d93025';
+                          e.currentTarget.style.backgroundColor = '#fce8e6';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = '#9aa0a6';
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        <Trash2 size={15} />
+                      </button>
 
                       {/* Status indicator */}
                       {isSigningInThis && (

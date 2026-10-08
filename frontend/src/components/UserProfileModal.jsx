@@ -413,9 +413,18 @@ export default function UserProfileModal() {
                   <label className="form-label" style={{ fontSize: 11 }}>Phone</label>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]{10}"
+                    maxLength={10}
+                    placeholder="9876543210"
                     className="form-input"
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        phone: e.target.value.replace(/\D/g, '').slice(0, 10),
+                      })
+                    }
                     required
                   />
                 </div>

@@ -18,6 +18,8 @@ import {
   Edit,
   Download,
   Wrench,
+  PackagePlus,
+  RotateCcw,
 } from 'lucide-react';
 import { exportToCSV } from '../../utils/exportCSV';
 
@@ -38,6 +40,16 @@ const ManageUsers = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [userAssets, setUserAssets] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Assign Asset Modal state
+  const [isAssignAssetOpen, setIsAssignAssetOpen] = useState(false);
+  const [assignTargetUser, setAssignTargetUser] = useState(null);
+  const [availableAssets, setAvailableAssets] = useState([]);
+  const [loadingAvailableAssets, setLoadingAvailableAssets] = useState(false);
+  const [selectedAssetToAssign, setSelectedAssetToAssign] = useState('');
+  const [assignRoomNumber, setAssignRoomNumber] = useState('');
+  const [assignHostelBlock, setAssignHostelBlock] = useState('');
+  const [assignLoading, setAssignLoading] = useState(false);
 
   // Add User Modal
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -168,16 +180,98 @@ const ManageUsers = () => {
     }
   };
 
+  const openAssignAssetModal = async (u) => {
+    setAssignTargetUser(u);
+    setAssignRoomNumber(u.roomNumber || '101');
+    setAssignHostelBlock(u.hostelBlock || 'Block A');
+    setSelectedAssetToAssign('');
+    setIsAssignAssetOpen(true);
+    try {
+      setLoadingAvailableAssets(true);
+      const res = await api.get('/assets', { params: { status: 'Available', limit: 100 } });
+      if (res.data.success) {
+        setAvailableAssets(res.data.assets || res.data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to load available assets', err);
+    } finally {
+      setLoadingAvailableAssets(false);
+    }
+  };
+
+  const handleAssignAssetSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedAssetToAssign) {
+      setMessage({ text: 'Please select an available asset to assign', type: 'danger' });
+      return;
+    }
+    try {
+      setAssignLoading(true);
+      const res = await api.put(`/assets/${selectedAssetToAssign}/assign`, {
+        userId: assignTargetUser._id,
+        roomNumber: assignRoomNumber,
+        hostelBlock: assignHostelBlock,
+      });
+      if (res.data.success) {
+        setMessage({
+          text: `Asset successfully assigned to ${assignTargetUser.name}!`,
+          type: 'success',
+        });
+        setIsAssignAssetOpen(false);
+        fetchUsers();
+        // If the inspect modal is currently open for this user, refresh their asset list
+        if (selectedUser && selectedUser._id === assignTargetUser._id) {
+          const userRes = await api.get(`/users/${selectedUser._id}`);
+          if (userRes.data.success) {
+            setUserAssets(userRes.data.assignedAssets || []);
+          }
+        }
+      }
+    } catch (err) {
+      setMessage({
+        text: err.response?.data?.message || 'Error assigning asset to user',
+        type: 'danger',
+      });
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const handleUnassignAsset = async (assetId, assetCode) => {
+    if (window.confirm(`Unassign asset ${assetCode} and return it to Available inventory?`)) {
+      try {
+        const res = await api.put(`/assets/${assetId}/unassign`);
+        if (res.data.success) {
+          setMessage({
+            text: `Asset ${assetCode} unassigned and returned to Available inventory.`,
+            type: 'success',
+          });
+          setUserAssets((prev) => prev.filter((a) => a._id !== assetId));
+          fetchUsers();
+        }
+      } catch (err) {
+        setMessage({
+          text: err.response?.data?.message || 'Error unassigning asset',
+          type: 'danger',
+        });
+      }
+    }
+  };
+
   const handleCreateUserSubmit = async (e) => {
     e.preventDefault();
     try {
       const res = await api.post('/users', userFormData);
       if (res.data.success) {
-        setMessage({ text: 'User account created successfully', type: 'success' });
+        const createdUser = res.data.user;
+        setMessage({ text: 'User account created successfully! You can now assign room assets.', type: 'success' });
         setIsAddUserOpen(false);
         setUserFormData(initialUserForm);
         setPage(1);
-        fetchUsers();
+        await fetchUsers();
+        if (createdUser && (createdUser.role === 'student' || createdUser.role === 'user')) {
+          openAssignAssetModal(createdUser);
+        }
       }
     } catch (err) {
       setMessage({
@@ -426,6 +520,17 @@ const ManageUsers = () => {
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
+                        {u.role !== 'admin' && (
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            title="Assign asset to student"
+                            onClick={() => openAssignAssetModal(u)}
+                            style={{ padding: '0.3rem 0.5rem', color: '#16a34a' }}
+                          >
+                            <PackagePlus size={14} />
+                            <span>Assign</span>
+                          </button>
+                        )}
                         <button
                           className="btn btn-secondary btn-sm"
                           title="View assigned assets"
@@ -489,16 +594,29 @@ const ManageUsers = () => {
           </p>
         </div>
 
-        <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.75rem', color: '#0f172a' }}>
-          Currently Assigned Assets ({userAssets.length})
-        </h4>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
+            Currently Assigned Assets ({userAssets.length})
+          </h4>
+          {selectedUser?.role !== 'admin' && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => openAssignAssetModal(selectedUser)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+            >
+              <PackagePlus size={14} />
+              <span>Assign Asset</span>
+            </button>
+          )}
+        </div>
 
         {userAssets.length === 0 ? (
           <p style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic', padding: '1.5rem', textAlign: 'center' }}>
             No assets currently assigned to this student.
           </p>
         ) : (
-          <div className="table-responsive" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+          <div className="table-responsive" style={{ maxHeight: '280px', overflowY: 'auto' }}>
             <table className="table" style={{ fontSize: '0.85rem' }}>
               <thead>
                 <tr>
@@ -507,6 +625,7 @@ const ManageUsers = () => {
                   <th>CATEGORY</th>
                   <th>CONDITION</th>
                   <th>STATUS</th>
+                  <th style={{ textAlign: 'right' }}>ACTION</th>
                 </tr>
               </thead>
               <tbody>
@@ -517,6 +636,18 @@ const ManageUsers = () => {
                     <td>{asset.category}</td>
                     <td>{asset.condition}</td>
                     <td><StatusBadge status={asset.status} /></td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        title="Unassign and return to available inventory"
+                        onClick={() => handleUnassignAsset(asset._id, asset.assetCode)}
+                        style={{ padding: '0.2rem 0.5rem', color: '#d97706', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                      >
+                        <RotateCcw size={12} />
+                        <span>Unassign</span>
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -529,6 +660,108 @@ const ManageUsers = () => {
             Close
           </button>
         </div>
+      </Modal>
+
+      {/* Assign Asset to Student Modal */}
+      <Modal
+        isOpen={isAssignAssetOpen}
+        onClose={() => setIsAssignAssetOpen(false)}
+        title={`Assign Asset to ${assignTargetUser?.name || 'Resident'}`}
+      >
+        <form onSubmit={handleAssignAssetSubmit}>
+          <div style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid #e2e8f0', marginBottom: '1.25rem' }}>
+            <div style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: 600 }}>
+              {assignTargetUser?.name} <span style={{ color: '#64748b', fontWeight: 400 }}>({assignTargetUser?.email})</span>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: '0.25rem' }}>
+              Student ID: <strong>{assignTargetUser?.studentId || 'N/A'}</strong> • Default Room: <strong>{assignTargetUser?.hostelBlock} - {assignTargetUser?.roomNumber}</strong>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Select Available Asset *</label>
+            {loadingAvailableAssets ? (
+              <p style={{ fontSize: '0.85rem', color: '#64748b', padding: '0.5rem 0' }}>Loading available inventory...</p>
+            ) : availableAssets.length === 0 ? (
+              <div style={{ padding: '0.75rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#991b1b', fontSize: '0.85rem' }}>
+                No assets are currently available in inventory. Please add new assets or unassign existing ones first.
+              </div>
+            ) : (
+              <select
+                className="form-control"
+                value={selectedAssetToAssign}
+                onChange={(e) => setSelectedAssetToAssign(e.target.value)}
+                required
+              >
+                <option value="">-- Choose an available asset ({availableAssets.length} available) --</option>
+                {availableAssets.map((asset) => (
+                  <option key={asset._id} value={asset._id}>
+                    [{asset.assetCode}] {asset.assetName} ({asset.category} - {asset.condition}) - Current: {asset.hostelBlock} {asset.roomNumber}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {selectedAssetToAssign && (() => {
+            const chosen = availableAssets.find((a) => a._id === selectedAssetToAssign);
+            if (!chosen) return null;
+            return (
+              <div style={{ padding: '0.75rem', background: '#eff6ff', borderRadius: '6px', border: '1px solid #bfdbfe', marginBottom: '1.25rem', fontSize: '0.8rem', color: '#1e3a8a' }}>
+                <div style={{ fontWeight: 600 }}>{chosen.assetName} (<code>{chosen.assetCode}</code>)</div>
+                <div style={{ marginTop: '0.2rem', color: '#2563eb' }}>
+                  Category: {chosen.category} • Condition: {chosen.condition} • Value: ₹{chosen.price || 0}
+                </div>
+                {chosen.description && (
+                  <div style={{ marginTop: '0.2rem', color: '#475569', fontStyle: 'italic' }}>
+                    {chosen.description}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label className="form-label">Hostel Block *</label>
+              <input
+                type="text"
+                className="form-control"
+                value={assignHostelBlock}
+                onChange={(e) => setAssignHostelBlock(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Room Number *</label>
+              <input
+                type="text"
+                className="form-control"
+                value={assignRoomNumber}
+                onChange={(e) => setAssignRoomNumber(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsAssignAssetOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={assignLoading || !selectedAssetToAssign}
+            >
+              {assignLoading ? 'Assigning...' : 'Confirm Assignment'}
+            </button>
+          </div>
+        </form>
       </Modal>
 
       {/* Add User Modal */}
@@ -630,11 +863,19 @@ const ManageUsers = () => {
           <div className="form-group">
             <label className="form-label">Contact Phone</label>
             <input
-              type="text"
+              type="tel"
+              inputMode="numeric"
+              pattern="[0-9]{10}"
+              maxLength={10}
               className="form-control"
-              placeholder="+91 98765 43210"
+              placeholder="9876543210"
               value={userFormData.phone}
-              onChange={(e) => setUserFormData({ ...userFormData, phone: e.target.value })}
+              onChange={(e) =>
+                setUserFormData({
+                  ...userFormData,
+                  phone: e.target.value.replace(/\D/g, '').slice(0, 10),
+                })
+              }
             />
           </div>
 
@@ -733,10 +974,19 @@ const ManageUsers = () => {
             <div className="form-group">
               <label className="form-label">Contact Phone</label>
               <input
-                type="text"
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]{10}"
+                maxLength={10}
                 className="form-control"
+                placeholder="9876543210"
                 value={editFormData.phone}
-                onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                onChange={(e) =>
+                  setEditFormData({
+                    ...editFormData,
+                    phone: e.target.value.replace(/\D/g, '').slice(0, 10),
+                  })
+                }
               />
             </div>
           </div>

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
+import { saveOAuthAccount } from '../utils/authStorage';
 
 const AuthContext = createContext();
 
@@ -15,8 +16,10 @@ export const AuthProvider = ({ children }) => {
 
     if (storedToken && storedUser) {
       try {
+        const parsedUser = JSON.parse(storedUser);
         setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+        setUser(parsedUser);
+        saveOAuthAccount(parsedUser);
       } catch (err) {
         console.error('Failed to parse cached user data', err);
         localStorage.removeItem('hams_token');
@@ -34,6 +37,7 @@ export const AuthProvider = ({ children }) => {
         setUser(data.user);
         localStorage.setItem('hams_token', data.token);
         localStorage.setItem('hams_user', JSON.stringify(data.user));
+        saveOAuthAccount(data.user);
         return { success: true, user: data.user };
       }
       return { success: false, message: data.message || 'Login failed' };
@@ -52,6 +56,7 @@ export const AuthProvider = ({ children }) => {
         setUser(data.user);
         localStorage.setItem('hams_token', data.token);
         localStorage.setItem('hams_user', JSON.stringify(data.user));
+        saveOAuthAccount(data.user);
         return { success: true, user: data.user };
       }
       return { success: false, message: data.message || 'Registration failed' };
@@ -70,6 +75,7 @@ export const AuthProvider = ({ children }) => {
         setUser(data.user);
         localStorage.setItem('hams_token', data.token);
         localStorage.setItem('hams_user', JSON.stringify(data.user));
+        saveOAuthAccount(data.user);
         return { success: true, user: data.user };
       }
       return { success: false, message: data.message || 'Google sign-in failed' };
